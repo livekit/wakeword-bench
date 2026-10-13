@@ -323,13 +323,23 @@ class BenchResult:
         df.to_parquet(out / "samples.parquet")
         np.savez_compressed(out / "times.npz", **{k: v[0] for k, v in self.traces.items()})
         np.savez_compressed(
-            out / "scores.npz", **{k: v[1].astype(np.float16) for k, v in self.traces.items()}
+            out / "scores.npz", **{k: v[1].astype(np.float32) for k, v in self.traces.items()}
         )
         meta = {"detector": self.detector, "cfg": self.cfg.__dict__}
         (out / "run.json").write_text(json.dumps(meta, indent=2))
         (out / "summary.json").write_text(json.dumps(self.summary(), indent=2))
         (out / "breakdown.json").write_text(json.dumps(self.breakdown(), indent=2))
         return out
+
+    def rescore(self, cfg: BenchConfigRun | None = None) -> BenchResult:
+        """Recompute every metric from the stored score traces (no model run), e.g. with a
+        different debounce / latency window / score target."""
+        comp = {r["id"]: r.get("compute_s", 0.0) for r in self.rows}
+        results = [
+            SampleResult(r["id"], *self.traces[r["id"]], comp[r["id"]], r["duration_s"])
+            for r in self.rows
+        ]
+        return evaluate(results, self.rows, self.detector, cfg or self.cfg)
 
     @classmethod
     def load(cls, out_dir: str | Path) -> BenchResult:
@@ -419,15 +429,31 @@ def _clean(a: np.ndarray) -> list[float | None]:
     return [None if (v != v) else round(float(v), 5) for v in a]
 
 
+_DERIVED = (
+    "detected",
+    "first_hit_s",
+    "events",
+    "compute_s",
+    "level_bucket",
+    "speed_bucket",
+    "voice",
+    "eq_applied",
+    "max_score",
+    "max_score_t",
+    "early_max_score",
+)
+
+
 def evaluate(
     results: Iterable[SampleResult],
-    data: WakeWordData,
+    data: WakeWordData | list[dict[str, Any]],
     detector_name: str,
     cfg: BenchConfigRun | None = None,
 ) -> BenchResult:
     """Turn raw score timelines into per-sample, per-threshold outcomes."""
     cfg = cfg or BenchConfigRun()
-    meta = {m["id"]: m for m in data.metadata().to_dict("records")}
+    records = data if isinstance(data, list) else data.metadata().to_dict("records")
+    meta = {m["id"]: {k: v for k, v in m.items() if k not in _DERIVED} for m in records}
     rows: list[dict[str, Any]] = []
     traces: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     for r in results:
