@@ -56,6 +56,9 @@ Values are parsed as YAML, so numbers, booleans, lists and maps all work on the 
 | `tts.sample_rate` | 24000 | TTS output rate (clips are stored at 16 kHz) |
 | `tts.retries` | 3 | retries per failed request |
 
+> [!WARNING]
+> TTS connections are shared with production voice agents. Using your full connection allowance for generation can prevent agents from generating speech. Set `tts.concurrency` below the account limit to reserve capacity for production; the generator does not reserve it automatically.
+
 ## Augmentation
 
 See [Augmentation](augmentation.md) for what each step does.

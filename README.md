@@ -142,6 +142,9 @@ uv run lkwb generate "hey jarvis" --size small -o out/hey_jarvis
 
 Choose the plan that matches your account: `--plan build` (default), `ship` or `scale`. Don't raise TTS concurrency above your plan's limit. Synthesized speech is cached, so changing only the augmentation reuses it.
 
+> [!WARNING]
+> Generation shares TTS connection capacity with your production voice agents. Using all available connections can prevent those agents from generating speech. Leave capacity for production by setting a lower limit, such as `--set tts.concurrency=2`, based on your plan and expected traffic.
+
 To target competing speakers in training:
 
 ```bash
