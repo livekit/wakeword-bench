@@ -17,6 +17,7 @@ Generate realistic wake word datasets and benchmark **any** wake word model on t
 **Quick Links:**
 
 - [Why a benchmark](#why-a-benchmark)
+- [Sample results: where `hey_livekit.onnx` fails](#sample-results-hey_livekitonnx)
 - [Benchmark a model in 2 commands](#benchmark-a-model)
 - [Generate your own dataset](#generate-a-dataset) (LiveKit credentials and plans)
 - [Use the data for training](#use-the-data)
@@ -35,7 +36,48 @@ The goal is very performant wake word models, built by **agents doing auto-resea
 - **actionable:** the same generator produces more training data for exactly those conditions
 - **cheap and machine-readable:** quick subset runs, cached TTS, JSON output, slice-by-slice `compare`
 
-For example, the current `hey_livekit.onnx` reaches 76% recall overall, but only 38% with a competing talker, 63% for "Okay, hey LiveKit", and 59% for UK accents. It also fires on 59% of confusable phrases. Each of those is a concrete next experiment.
+The [sample results](#sample-results-hey_livekitonnx) below show what that looks like for the current model.
+
+## Sample results: `hey_livekit.onnx`
+
+The current livekit-wakeword model on the full public test split: 7,873 clips (12.3 h), all from voices, rooms and noise it never trained on. To reproduce: `lkwb bench -d livekit:hey_livekit.onnx`, then `lkwb figures results/livekit_hey_livekit`.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/scorecard_dark.svg">
+  <img alt="Scorecard: score 44.5%, recall 76.0%, 28.9 false alarms per hour, 58.9% of confusables accepted, latency p50 -64 ms, RTF 0.21" src="assets/scorecard_light.svg">
+</picture>
+
+**The headline.** At the default threshold (0.5), the model catches 76% of wake words but fires **28.9 times per hour** on ordinary audio. An always-listening device needs ≲ 0.5/h. Reaching that takes threshold 0.94, and recall drops to **44.5%**: the `score`.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/tradeoff_dark.svg">
+  <img alt="Recall vs false alarms per hour: 44.5% recall at the 0.5/h target, 76% at 28.9/h" src="assets/tradeoff_light.svg">
+</picture>
+
+**Where it misses wake words.** A slice is colored only when its 95% CI excludes the overall 76%:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/failures_dark.svg">
+  <img alt="Recall per slice with 95% confidence intervals" src="assets/failures_light.svg">
+</picture>
+
+1. **A competing talker is the biggest failure.** Recall falls from 83% to 38–61%. The louder the other voice, the worse it gets: 67% at 15–20 dB SIR, 30% at 0–5 dB (n ≈ 150 per bin). Even a quiet background talker costs 16 points.
+2. **Phrasing:** "Okay, hey LiveKit" gets 63% [59–67], versus 83% [79–86] for "Hey LiveKit, …". The model is weak when the wake word *follows* other speech.
+3. **Voices:** UK accents get 59% [55–64] (n = 418), versus 82% for US. By TTS provider, Cartesia voices get 64%, versus 83–84% for xAI and Rime.
+4. **Noise:** only the extreme bucket (−5–0 dB SNR, 62%) and speech-like noise (babble 62%, music 62%) hurt significantly. Reverberant rooms get 72%, versus 80% dry.
+5. **Not a problem:** codecs (Opus 8–32k, MP3, μ-law: 70–78%, every CI overlaps the overall rate), band-limiting and mic EQ.
+
+**What makes it fire.**
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/false_alarms_dark.svg">
+  <img alt="False alarms per hour by source and confusable phrases accepted" src="assets/false_alarms_light.svg">
+</picture>
+
+1. **It accepts near-miss phrases.** 59% of 3,000 confusables trigger it. Swapping *any one* word is accepted about 60% of the time ("kit" 62%, "live" 61%, "hey" 58%). The model matches the overall sound shape rather than checking each word. Worst phrases: "hey lice kit" 90%, "hayes live kit" 88%, "hey lies kit" 86%.
+2. **Speech causes the false alarms, not noise.** At threshold 0.5: everyday TTS speech 45.7/h, real conversation 30.6/h, background noise only 12.6/h.
+
+**Caveats.** The wake words are synthetic TTS (phoneme-steered, 157 voices), not human recordings, so absolute recall on real users may differ. Slice comparisons are the reliable part. FPPH comes from 6.1 h of negatives: zero false alarms at threshold 0.94 means the true rate is ≤ 0.49/h with 95% confidence, but the data can't tell 0.5/h apart from 0.1/h. Latency p50 is −64 ms, meaning the model usually fires just before the word finishes.
 
 ## Benchmark a model
 

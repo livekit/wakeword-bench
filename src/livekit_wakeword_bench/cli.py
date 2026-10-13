@@ -293,6 +293,20 @@ def _agent_view(res: object, run_dir: Path, worst: int = 5) -> dict:
 
 
 @app.command()
+def figures(
+    run: Path = typer.Argument(..., help="Saved run dir (results/<model>)"),
+    out: Path = typer.Option(Path("assets"), "--out", "-o"),
+    prefix: str = typer.Option("", help="Filename prefix"),
+) -> None:
+    """README-ready SVG charts (dark + light): scorecard, tradeoff, failures, false alarms."""
+    from .bench import BenchResult
+    from .viz import write_figures
+
+    for p in write_figures(BenchResult.load(run), out, prefix):
+        console.print(p)
+
+
+@app.command()
 def report(
     runs: list[Path] = typer.Argument(..., help="Saved run directories"),
     out: Path = typer.Option(Path("results/report.html"), "--out", "-o"),
