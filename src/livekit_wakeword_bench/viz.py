@@ -1,6 +1,6 @@
 """Static SVG charts in the LiveKit Bytes design language (dark canonical, light variant).
 
-Used by the HTML report and `lkwb figures` (README images). No plotting dependencies.
+Charts carry almost no text: labels, values, axes. Explanations belong in captions.
 """
 
 from __future__ import annotations
@@ -9,6 +9,8 @@ import html
 import math
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from .bench import THRESHOLDS, BenchResult, wilson
 
@@ -93,128 +95,219 @@ def _e(x: Any) -> str:
     return html.escape(str(x))
 
 
-def _svg(w: int, h: int, body: str, c: dict[str, str], bg: bool = True) -> str:
-    rect = f'<rect width="{w}" height="{h}" rx="8" fill="{c["bg1"]}"/>' if bg else ""
+def _svg(w: int, h: int, body: str, c: dict[str, str]) -> str:
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" '
-        f'font-family="{_e(SANS)}">{rect}{body}</svg>'
+        f'font-family="{_e(SANS)}"><rect width="{w}" height="{h}" fill="{c["bg1"]}"/>{body}</svg>'
+    )
+
+
+def _text(
+    x: float,
+    y: float,
+    s: str,
+    c: str,
+    size: float = 12,
+    anchor: str = "start",
+    mono: bool = False,
+    weight: int = 400,
+    caps: bool = False,
+) -> str:
+    fam = f' font-family="{_e(MONO)}"' if mono or caps else ""
+    ls = ' letter-spacing="0.7"' if caps else ""
+    s = s.upper() if caps else s
+    return (
+        f'<text x="{x:.1f}" y="{y:.1f}" fill="{c}" font-size="{size}" text-anchor="{anchor}"'
+        f' font-weight="{weight}"{fam}{ls}>{_e(s)}</text>'
     )
 
 
 def _pct(v: float | None) -> str:
-    return "–" if v is None else f"{100 * v:.1f}%"
+    return "–" if v is None else f"{100 * v:.0f}%"
 
 
-def _caps(x: str) -> str:
-    return _e(x.upper())
+def _ci_bar(
+    x0: float, sx: Any, cy: float, v: float, lo: float, hi: float, col: str, c: dict
+) -> str:
+    out = f'<rect x="{x0}" y="{cy - 7:.1f}" width="{max(sx(v) - x0, 1):.1f}" height="14" fill="{col}"/>'
+    out += f'<line x1="{sx(lo):.1f}" y1="{cy:.1f}" x2="{sx(hi):.1f}" y2="{cy:.1f}" stroke="{c["fg0"]}" stroke-width="1.3"/>'
+    for e in (lo, hi):
+        out += f'<line x1="{sx(e):.1f}" y1="{cy - 4:.1f}" x2="{sx(e):.1f}" y2="{cy + 4:.1f}" stroke="{c["fg0"]}" stroke-width="1.3"/>'
+    return out
 
 
-# ---- scorecard -------------------------------------------------------------------------------
+def _tone(lo: float, hi: float, ref: float, c: dict, good_high: bool = True) -> str:
+    if hi < ref:
+        return c["chart8"] if good_high else c["success"]
+    if lo > ref:
+        return c["success"] if good_high else c["chart8"]
+    return c["fg4"]
+
+
+# ---- teaser: one clip, with and without a second voice ----------------------------------------
+def traces(examples: list[dict[str, Any]], thr: float, theme: str = "dark", w: int = 520) -> str:
+    """examples: [{"label", "audio", "sr", "times", "scores"}]; waveform + score per row."""
+    c = PALETTE[theme]
+    row_h, top, L, R = 120, 16, 16, 16
+    h = top + len(examples) * row_h + 26
+    out = []
+    T = max(len(e["audio"]) / e["sr"] for e in examples)
+    sx = lambda t: L + t / T * (w - L - R)  # noqa: E731
+    for i, ex in enumerate(examples):
+        y0 = top + i * row_h
+        hit = bool(np.any(ex["scores"] >= thr))
+        col = c["success"] if hit else c["chart8"]
+        out.append(_text(L, y0 + 12, ex["label"], c["fg1"], 13, weight=600))
+        out.append(
+            _text(w - R, y0 + 12, "detected" if hit else "missed", col, 12, "end", caps=True)
+        )
+        a = ex["audio"]
+        n = 240
+        seg = np.array_split(np.abs(a), n)
+        peak = max(float(np.abs(a).max()), 1e-6)
+        mid, amp = y0 + 52, 18
+        for j, s in enumerate(seg):
+            v = float(s.max()) / peak * amp if len(s) else 0
+            x = sx(j / n * T)
+            out.append(
+                f'<line x1="{x:.1f}" y1="{mid - v:.1f}" x2="{x:.1f}" y2="{mid + v:.1f}" stroke="{c["fg4"]}" stroke-width="1"/>'
+            )
+        sy = lambda s, y0=y0: y0 + 106 - s * 36  # noqa: E731
+        out.append(
+            f'<line x1="{L}" y1="{sy(thr):.1f}" x2="{w - R}" y2="{sy(thr):.1f}" stroke="{c["fg3"]}" stroke-dasharray="3 3"/>'
+        )
+        pts = " ".join(
+            f"{sx(float(t)):.1f},{sy(float(s)):.1f}" for t, s in zip(ex["times"], ex["scores"])
+        )
+        out.append(f'<polyline points="{pts}" fill="none" stroke="{col}" stroke-width="2"/>')
+        k = int(np.argmax(ex["scores"]))
+        out.append(
+            f'<circle cx="{sx(float(ex["times"][k])):.1f}" cy="{sy(float(ex["scores"][k])):.1f}" r="3.5" fill="{col}"/>'
+        )
+    out.append(
+        _text(w - R, h - 8, f"score  ···  threshold {thr:g}", c["fg3"], 11, "end", mono=True)
+    )
+    return _svg(w, h, "".join(out), c)
+
+
+def recall_by_talker(res: BenchResult, theme: str = "dark", w: int = 340) -> str:
+    """Recall vs competing-talker loudness (SIR bins)."""
+    c = PALETTE[theme]
+    df = res.frame()
+    ti = int(np.argmin(np.abs(THRESHOLDS - res.cfg.threshold)))
+    pos = df[df.label == 1].copy()
+    pos["hit"] = [d[ti] for d in pos.detected]
+    groups = [("none", pos[pos.interferer == ""])]
+    tk = pos[pos.interferer != ""]
+    for lo, hi in ((15, 20), (10, 15), (5, 10), (0, 5)):
+        groups.append((f"{lo}–{hi}", tk[(tk.sir_db >= lo) & (tk.sir_db < hi)]))
+    L, R, T, B = 40, 12, 24, 44
+    h = 282
+    bw = (w - L - R) / len(groups)
+    sy = lambda v: T + (1 - v) * (h - T - B)  # noqa: E731
+    out = []
+    for v in (0, 0.5, 1):
+        out.append(
+            f'<line x1="{L}" y1="{sy(v):.1f}" x2="{w - R}" y2="{sy(v):.1f}" stroke="{c["separator1"]}"/>'
+        )
+        out.append(_text(L - 6, sy(v) + 4, f"{int(v * 100)}%", c["fg3"], 10.5, "end", mono=True))
+    for i, (name, g) in enumerate(groups):
+        if not len(g):
+            continue
+        r = float(g.hit.mean())
+        lo, hi = wilson(float(g.hit.sum()), len(g))
+        x = L + i * bw + bw * 0.18
+        col = c["accent"] if i == 0 else c["chart8"]
+        out.append(
+            f'<rect x="{x:.1f}" y="{sy(r):.1f}" width="{bw * 0.64:.1f}" height="{sy(0) - sy(r):.1f}" fill="{col}"/>'
+        )
+        cx = x + bw * 0.32
+        out.append(
+            f'<line x1="{cx:.1f}" y1="{sy(lo):.1f}" x2="{cx:.1f}" y2="{sy(hi):.1f}" stroke="{c["fg0"]}" stroke-width="1.3"/>'
+        )
+        out.append(_text(cx, sy(hi) - 6, _pct(r), c["fg0"], 12, "middle", mono=True, weight=600))
+        out.append(_text(cx, h - B + 16, name, c["fg2"], 11, "middle", mono=True))
+    out.append(
+        _text(
+            (L + w - R) / 2, h - 8, "second voice: dB quieter than speaker", c["fg3"], 11, "middle"
+        )
+    )
+    return _svg(w, h, "".join(out), c)
+
+
+# ---- headline numbers ------------------------------------------------------------------------
 def scorecard(res: BenchResult, theme: str = "dark", w: int = 880) -> str:
     c = PALETTE[theme]
     s = res.summary()
     a = s["at_threshold"]
     tiles = [
-        (
-            "score",
-            _pct(s["score"]),
-            f"recall at ≤ {res.cfg.score_fpph:g} false alarms / h",
-            c["accent"],
-        ),
-        ("recall", _pct(a["recall"]), f"at threshold {a['threshold']:g}", c["fg0"]),
-        (
-            "false alarms / h",
-            f"{a['fpph']:.1f}",
-            f"at threshold {a['threshold']:g}, {s['fpph_hours']:.1f} h of audio",
-            c["fg0"],
-        ),
-        (
-            "confusables accepted",
-            _pct(a["adversarial_false_accept_rate"]),
-            f"of {s['n_adversarial']:,} near-miss phrases",
-            c["fg0"],
-        ),
+        ("score", f"{100 * s['score']:.1f}%", c["accent"]),
+        ("recall", f"{100 * a['recall']:.1f}%", c["fg0"]),
+        ("false alarms / h", f"{a['fpph']:.1f}", c["fg0"]),
+        ("near-misses accepted", f"{100 * a['adversarial_false_accept_rate']:.0f}%", c["fg0"]),
         (
             "latency p50",
             f"{a['latency_ms_p50']:+.0f} ms" if a["latency_ms_p50"] is not None else "–",
-            "vs end of wake word",
             c["fg0"],
         ),
-        ("compute", f"{s['compute']['real_time_factor']:.2f}×", "real-time factor (CPU)", c["fg0"]),
+        ("compute", f"{s['compute']['real_time_factor']:.2f}× RT", c["fg0"]),
     ]
-    cols, gap, pad = 3, 12, 20
-    tw = (w - 2 * pad - (cols - 1) * gap) / cols
-    th = 96
+    cols, gap = 3, 1
+    tw = (w - (cols - 1) * gap) / cols
+    th = 84
     rows = math.ceil(len(tiles) / cols)
-    h = pad * 2 + 30 + rows * th + (rows - 1) * gap
-    out = [
-        f'<text x="{pad}" y="{pad + 14}" fill="{c["fg1"]}" font-size="14" font-weight="600">{_e(res.detector)}</text>',
-        f'<text x="{w - pad}" y="{pad + 14}" fill="{c["fg3"]}" font-size="12" text-anchor="end">'
-        f"{s['n_positive']:,} wake words · {s['n_negative']:,} negatives · held-out voices &amp; rooms</text>",
-    ]
-    for i, (label, value, sub, col) in enumerate(tiles):
-        x = pad + (i % cols) * (tw + gap)
-        y = pad + 30 + (i // cols) * (th + gap)
-        out.append(
-            f'<rect x="{x:.1f}" y="{y}" width="{tw:.1f}" height="{th}" rx="6" fill="{c["bg2"]}" stroke="{c["separator1"]}"/>'
-        )
-        out.append(
-            f'<text x="{x + 16:.1f}" y="{y + 24}" fill="{c["fg3"]}" font-family="{_e(MONO)}" font-size="11" letter-spacing="0.6">{_caps(label)}</text>'
-        )
-        out.append(
-            f'<text x="{x + 16:.1f}" y="{y + 60}" fill="{col}" font-family="{_e(MONO)}" font-size="30" font-weight="500">{_e(value)}</text>'
-        )
-        out.append(
-            f'<text x="{x + 16:.1f}" y="{y + 82}" fill="{c["fg4"]}" font-size="11.5">{_e(sub)}</text>'
-        )
+    h = rows * th + (rows - 1) * gap
+    out = [f'<rect width="{w}" height="{h}" fill="{c["separator1"]}"/>']
+    for i, (label, value, col) in enumerate(tiles):
+        x = (i % cols) * (tw + gap)
+        y = (i // cols) * (th + gap)
+        out.append(f'<rect x="{x:.1f}" y="{y}" width="{tw:.1f}" height="{th}" fill="{c["bg1"]}"/>')
+        out.append(_text(x + 18, y + 26, label, c["fg3"], 10.5, caps=True))
+        out.append(_text(x + 18, y + 64, value, col, 28, mono=True, weight=500))
     return _svg(w, int(h), "".join(out), c)
 
 
-# ---- recall vs false alarms --------------------------------------------------------------------
-def tradeoff(results: list[BenchResult], theme: str = "dark", w: int = 880, h: int = 380) -> str:
+# ---- recall vs false alarms ------------------------------------------------------------------
+def tradeoff(results: list[BenchResult], theme: str = "dark", w: int = 880, h: int = 340) -> str:
     c = PALETTE[theme]
-    L, R, T, B = 64, 24, 48, 52
+    L, R, T, B = 56, 24, 24, 48
     xmin, xmax = 0.1, 1000.0
 
     def lx(f: float) -> float:
         span = math.log10(xmax) - math.log10(xmin)
         return L + (math.log10(min(max(f, xmin), xmax)) - math.log10(xmin)) / span * (w - L - R)
 
-    ly = lambda r: T + (1 - r) * (h - T - B)  # noqa: E731
-    out = [
-        f'<text x="{L}" y="26" fill="{c["fg1"]}" font-size="14" font-weight="600">Recall vs false alarms</text>',
-        f'<text x="{w - R}" y="26" fill="{c["fg3"]}" font-size="12" text-anchor="end">each step = one threshold · up and left is better</text>',
-    ]
+    def ly(r: float) -> float:
+        return T + (1 - r) * (h - T - B)
+
+    out = []
     for f in (0.1, 1, 10, 100, 1000):
         out.append(
             f'<line x1="{lx(f):.1f}" y1="{T}" x2="{lx(f):.1f}" y2="{h - B}" stroke="{c["separator1"]}"/>'
         )
-        out.append(
-            f'<text x="{lx(f):.1f}" y="{h - B + 18}" fill="{c["fg3"]}" font-family="{_e(MONO)}" font-size="11" text-anchor="middle">{f:g}</text>'
-        )
-    for r in (0, 0.25, 0.5, 0.75, 1):
+        out.append(_text(lx(f), h - B + 18, f"{f:g}", c["fg3"], 11, "middle", mono=True))
+    for r in (0, 0.5, 1):
         out.append(
             f'<line x1="{L}" y1="{ly(r):.1f}" x2="{w - R}" y2="{ly(r):.1f}" stroke="{c["separator1"]}"/>'
         )
-        out.append(
-            f'<text x="{L - 10}" y="{ly(r) + 4:.1f}" fill="{c["fg3"]}" font-family="{_e(MONO)}" font-size="11" text-anchor="end">{int(r * 100)}%</text>'
-        )
+        out.append(_text(L - 8, ly(r) + 4, f"{int(r * 100)}%", c["fg3"], 11, "end", mono=True))
+    out.append(_text((L + w - R) / 2, h - 10, "false alarms per hour", c["fg3"], 12, "middle"))
+    ym = (T + h - B) / 2
     out.append(
-        f'<text x="{(L + w - R) / 2}" y="{h - 12}" fill="{c["fg3"]}" font-size="12" text-anchor="middle">false alarms per hour (log)</text>'
-    )
-    out.append(
-        f'<text x="18" y="{(T + h - B) / 2}" fill="{c["fg3"]}" font-size="12" text-anchor="middle" transform="rotate(-90 18 {(T + h - B) / 2})">recall</text>'
+        f'<text transform="rotate(-90 16 {ym})" x="16" y="{ym}" fill="{c["fg3"]}" font-size="12" text-anchor="middle">recall</text>'
     )
     tgt = results[0].cfg.score_fpph if results else 0.5
     out.append(
-        f'<line x1="{lx(tgt):.1f}" y1="{T}" x2="{lx(tgt):.1f}" y2="{h - B}" stroke="{c["fg4"]}" stroke-dasharray="4 4"/>'
+        f'<rect x="{L}" y="{T}" width="{lx(tgt) - L:.1f}" height="{h - T - B}" fill="{c["accent"]}" fill-opacity="0.07"/>'
     )
     out.append(
-        f'<text x="{lx(tgt) + 6:.1f}" y="{T + 14}" fill="{c["fg3"]}" font-size="11">target ≤ {tgt:g}/h</text>'
+        f'<line x1="{lx(tgt):.1f}" y1="{T}" x2="{lx(tgt):.1f}" y2="{h - B}" stroke="{c["fg3"]}" stroke-dasharray="3 3"/>'
     )
+    out.append(_text(lx(tgt) + 6, T + 16, f"≤ {tgt:g}/h", c["fg3"], 11, mono=True))
     for i, res in enumerate(results):
         col = c[SERIES[i % len(SERIES)]]
-        cv = res.summary()["curve"]
+        s = res.summary()
+        cv = s["curve"]
         pts: list[tuple[float, float]] = []
         for f, r in reversed(list(zip(cv["fpph"], cv["recall"]))):
             if f is None or r is None:
@@ -223,84 +316,88 @@ def tradeoff(results: list[BenchResult], theme: str = "dark", w: int = 880, h: i
             if pts:
                 pts.append((x, pts[-1][1]))
             pts.append((x, y))
-        d = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
-        out.append(f'<polyline points="{d}" fill="none" stroke="{col}" stroke-width="2"/>')
-        s = res.summary()
+        out.append(
+            f'<polyline points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in pts)}" fill="none" stroke="{col}" stroke-width="2"/>'
+        )
         a = s["at_threshold"]
-        sx, sy = lx(a["fpph"]), ly(a["recall"])
         out.append(
-            f'<circle cx="{sx:.1f}" cy="{sy:.1f}" r="4.5" fill="{c["bg1"]}" stroke="{col}" stroke-width="2"/>'
+            f'<circle cx="{lx(a["fpph"]):.1f}" cy="{ly(a["recall"]):.1f}" r="4" fill="{c["bg1"]}" stroke="{col}" stroke-width="2"/>'
         )
         out.append(
-            f'<text x="{sx + 9:.1f}" y="{sy + 16:.1f}" fill="{c["fg2"]}" font-family="{_e(MONO)}" font-size="11">thr {a["threshold"]:g}: {_pct(a["recall"])} @ {a["fpph"]:.1f}/h</text>'
-        )
-        tgt_op = s["at_target_fpph"].get(f"fpph<={tgt}") or s["at_target_fpph"].get(
-            f"fpph<={tgt:g}"
-        )
-        if tgt_op:
-            tx, ty = lx(max(tgt_op["fpph"], xmin)), ly(s["score"])
-            out.append(f'<circle cx="{tx:.1f}" cy="{ty:.1f}" r="5" fill="{col}"/>')
-            out.append(
-                f'<text x="{tx + 9:.1f}" y="{ty - 8:.1f}" fill="{col}" font-family="{_e(MONO)}" font-size="11.5" font-weight="600">score {_pct(s["score"])} (thr {tgt_op["threshold"]:g})</text>'
+            _text(
+                lx(a["fpph"]) + 8,
+                ly(a["recall"]) + 16,
+                f"{_pct(a['recall'])} at {a['fpph']:.0f}/h",
+                c["fg2"],
+                11.5,
+                mono=True,
             )
+        )
+        out.append(f'<circle cx="{lx(xmin):.1f}" cy="{ly(s["score"]):.1f}" r="5" fill="{col}"/>')
+        out.append(
+            _text(
+                lx(xmin) + 10,
+                ly(s["score"]) - 8,
+                f"{100 * s['score']:.1f}%",
+                col,
+                13,
+                mono=True,
+                weight=600,
+            )
+        )
         if len(results) > 1:
             out.append(
-                f'<rect x="{L + 12}" y="{T + 10 + i * 18}" width="10" height="10" rx="2" fill="{col}"/>'
+                f'<rect x="{w - R - 180}" y="{h - B - 18 - i * 18}" width="10" height="10" fill="{col}"/>'
             )
-            out.append(
-                f'<text x="{L + 28}" y="{T + 19 + i * 18}" fill="{c["fg2"]}" font-size="11.5">{_e(res.detector)}</text>'
-            )
+            out.append(_text(w - R - 164, h - B - 9 - i * 18, res.detector, c["fg2"], 11.5))
     return _svg(w, h, "".join(out), c)
 
 
-# ---- where it fails ----------------------------------------------------------------------------
+# ---- where it fails ------------------------------------------------------------------------------
 FAILURE_AXES = [
     (
         "interferer",
-        "Competing talker",
-        {
-            "": "none",
-            "ami": "meeting (AMI)",
-            "earnings22": "earnings call",
-            "peoples_speech": "web speech",
-        },
+        "Second voice",
+        {"": "none", "ami": "meeting", "earnings22": "phone call", "peoples_speech": "web audio"},
     ),
     (
         "text_form",
-        "How it's said",
+        "Phrasing",
         {
-            "isolated": "alone",
+            "isolated": "“Hey LiveKit”",
             "carrier_prefix": "“Hey LiveKit, …”",
             "carrier_suffix": "“Okay, hey LiveKit”",
         },
     ),
-    ("accent", "Speaker accent", {"unknown": "unlabeled"}),
+    ("accent", "Accent", {"unknown": "unlabeled"}),
     (
         "noise_bucket",
-        "Noise level",
+        "Noise",
         {
-            "clean": "clean",
-            "quiet": "quiet 20–30 dB",
-            "moderate": "moderate 10–20",
-            "noisy": "noisy 5–10",
-            "very_noisy": "very noisy 0–5",
-            "extreme": "extreme −5–0",
+            "clean": "none",
+            "quiet": "20–30 dB",
+            "moderate": "10–20 dB",
+            "noisy": "5–10 dB",
+            "very_noisy": "0–5 dB",
+            "extreme": "−5–0 dB",
         },
     ),
     ("noise_type", "Noise type", {"": "none"}),
     ("reverb", "Room", {"False": "dry", "True": "reverberant"}),
-    ("provider", "TTS provider", {}),
+    ("provider", "Voice provider", {}),
     ("codec", "Codec", {"none": "none"}),
 ]
 
 
 def _slices(
-    res: BenchResult, min_n: int, significant_only: bool = False
-) -> tuple[float, list[tuple[str, list[dict]]]]:
+    res: BenchResult, min_n: int, axes: list[str] | None, significant_only: bool
+) -> tuple[float, list]:
     bd = res.breakdown()
     overall = res.summary()["at_threshold"]["recall"]
     groups = []
     for ax, title, names in FAILURE_AXES:
+        if axes is not None and ax not in axes:
+            continue
         rows = [r for r in bd.get(f"positive/{ax}", []) if r["n"] >= min_n]
         if len(rows) < 2:
             continue
@@ -320,188 +417,194 @@ def failures(
     theme: str = "dark",
     w: int = 880,
     min_n: int = 50,
+    axes: list[str] | None = None,
     significant_only: bool = False,
 ) -> str:
-    """Recall per slice with 95% CIs. Colored only when the CI excludes the overall recall."""
+    """Recall per slice, 95% CI whiskers; colored only when the CI excludes the overall recall."""
     c = PALETTE[theme]
-    overall, groups = _slices(res, min_n, significant_only)
-    L, R, T, row, ghead, gap = 210, 120, 64, 22, 26, 12
-    n_rows = sum(len(g[1]) for g in groups)
-    h = T + len(groups) * (ghead + gap) + n_rows * row + 24
+    overall, groups = _slices(res, min_n, axes, significant_only)
+    L, R, T, row, ghead, gap = 190, 64, 16, 24, 28, 10
+    h = T + len(groups) * (ghead + gap) + sum(len(g[1]) for g in groups) * row + 26
     x0, x1 = L, w - R
     sx = lambda v: x0 + v * (x1 - x0)  # noqa: E731
-    out = [
-        f'<text x="24" y="26" fill="{c["fg1"]}" font-size="14" font-weight="600">Where it fails · recall at threshold {res.cfg.threshold:g}</text>',
-        f'<text x="24" y="44" fill="{c["fg3"]}" font-size="12">bars = recall, whiskers = 95% CI, colored only when the CI excludes the overall {_pct(overall)}</text>',
-    ]
-    for v in (0, 0.25, 0.5, 0.75, 1):
+    out = []
+    for v in (0, 0.5, 1):
         out.append(
-            f'<line x1="{sx(v):.1f}" y1="{T - 6}" x2="{sx(v):.1f}" y2="{h - 22}" stroke="{c["separator1"]}"/>'
+            f'<line x1="{sx(v):.1f}" y1="{T}" x2="{sx(v):.1f}" y2="{h - 24}" stroke="{c["separator1"]}"/>'
         )
-        out.append(
-            f'<text x="{sx(v):.1f}" y="{h - 8}" fill="{c["fg4"]}" font-family="{_e(MONO)}" font-size="10.5" text-anchor="middle">{int(v * 100)}%</text>'
-        )
+        out.append(_text(sx(v), h - 8, f"{int(v * 100)}%", c["fg4"], 10.5, "middle", mono=True))
     out.append(
-        f'<line x1="{sx(overall):.1f}" y1="{T - 6}" x2="{sx(overall):.1f}" y2="{h - 22}" stroke="{c["fg3"]}" stroke-dasharray="3 3"/>'
+        f'<line x1="{sx(overall):.1f}" y1="{T}" x2="{sx(overall):.1f}" y2="{h - 24}" stroke="{c["fg2"]}" stroke-dasharray="3 3"/>'
+    )
+    out.append(
+        _text(sx(overall), h - 8, f"all {_pct(overall)}", c["fg2"], 10.5, "middle", mono=True)
     )
     y = T
     for title, rows in groups:
-        out.append(
-            f'<text x="24" y="{y + 15}" fill="{c["fg2"]}" font-family="{_e(MONO)}" font-size="11" letter-spacing="0.6">{_caps(title)}</text>'
-        )
-        out.append(
-            f'<line x1="24" y1="{y + ghead - 4}" x2="{w - 24}" y2="{y + ghead - 4}" stroke="{c["separator1"]}"/>'
-        )
+        out.append(_text(24, y + 16, title, c["fg2"], 11, caps=True))
         y += ghead
         for r in rows:
             lo, hi = r["ci95"]
-            col = c["chart8"] if hi < overall else c["success"] if lo > overall else c["fg4"]
+            col = _tone(lo, hi, overall, c)
             cy = y + row / 2
+            out.append(_text(L - 12, cy + 4, r["label"], c["fg1"], 12.5, "end"))
+            out.append(_ci_bar(x0, sx, cy, r["recall"], lo, hi, col, c))
             out.append(
-                f'<text x="{L - 12}" y="{cy + 4:.1f}" fill="{c["fg1"]}" font-size="12" text-anchor="end">{_e(r["label"])}</text>'
-            )
-            out.append(
-                f'<rect x="{x0}" y="{cy - 6:.1f}" width="{max(sx(r["recall"]) - x0, 1):.1f}" height="12" rx="3" fill="{col}" fill-opacity="0.85"/>'
-            )
-            out.append(
-                f'<line x1="{sx(lo):.1f}" y1="{cy:.1f}" x2="{sx(hi):.1f}" y2="{cy:.1f}" stroke="{c["fg0"]}" stroke-width="1.2"/>'
-            )
-            for e in (lo, hi):
-                out.append(
-                    f'<line x1="{sx(e):.1f}" y1="{cy - 4:.1f}" x2="{sx(e):.1f}" y2="{cy + 4:.1f}" stroke="{c["fg0"]}" stroke-width="1.2"/>'
+                _text(
+                    x1 + 12,
+                    cy + 4,
+                    _pct(r["recall"]),
+                    c["fg1"] if col == c["fg4"] else col,
+                    12.5,
+                    mono=True,
+                    weight=600,
                 )
-            out.append(
-                f'<text x="{x1 + 10}" y="{cy + 4:.1f}" fill="{col if col != c["fg4"] else c["fg2"]}" font-family="{_e(MONO)}" font-size="12" font-weight="600">{100 * r["recall"]:.0f}%</text>'
-            )
-            out.append(
-                f'<text x="{x1 + 52}" y="{cy + 4:.1f}" fill="{c["fg4"]}" font-family="{_e(MONO)}" font-size="10.5">n={r["n"]}</text>'
             )
             y += row
         y += gap
     return _svg(w, int(h), "".join(out), c)
 
 
-# ---- false alarms -------------------------------------------------------------------------------
+# ---- what makes it fire --------------------------------------------------------------------------
 def _which_word(phrase: str, wake: list[str]) -> str | None:
     w = phrase.split()
     if len(w) == len(wake):
         diff = [i for i in range(len(w)) if w[i] != wake[i]]
-        if len(diff) == 1:
-            return f"“{wake[diff[0]]}” swapped"
-        return None
+        return f"“{wake[diff[0]]}” swapped" if len(diff) == 1 else None
     it = iter(wake)
-    if 0 < len(w) < len(wake) and all(x in it for x in w):  # true subsequence
-        return "word(s) dropped"
+    if 0 < len(w) < len(wake) and all(x in it for x in w):
+        return "word dropped"
     return None
 
 
-def false_alarms(res: BenchResult, theme: str = "dark", w: int = 880, top: int = 8) -> str:
-    """Left: false alarms / hour by audio source. Right: confusable phrases accepted."""
-    import numpy as np
-
+def near_misses(res: BenchResult, theme: str = "dark", w: int = 880, top: int = 6) -> str:
+    """Share of near-miss phrases accepted: by swapped word, then the worst phrases."""
     from .text import _cmu, _split_unknown
 
+    c = PALETTE[theme]
+    df = res.frame()
+    ti = int(np.argmin(np.abs(THRESHOLDS - res.cfg.threshold)))
+    adv = df[df.category == "adversarial"].copy()
+    adv["fa"] = [e[ti] > 0 for e in adv.events]
+    wake = [
+        p for wd in str(df.wake_word.iloc[0]).lower().split() for p in _split_unknown(wd, _cmu())
+    ]
+    adv["kind"] = adv.phrase.map(lambda p: _which_word(p, wake))
+    kinds = [
+        (k, g.fa.mean(), wilson(float(g.fa.sum()), len(g)))
+        for k, g in adv.dropna(subset=["kind"]).groupby("kind")
+        if len(g) >= 30
+    ]
+    kinds.sort(key=lambda r: -r[1])
+    phr = [
+        (f"“{p}”", g.fa.mean(), wilson(float(g.fa.sum()), len(g)))
+        for p, g in adv.groupby("phrase")
+        if len(g) >= 15
+    ]
+    phr.sort(key=lambda r: (-r[2][0], -r[1]))
+    phr = phr[:top]
+    overall = float(adv.fa.mean()) if len(adv) else 0.0
+    L, R, row, ghead, gap = 190, 64, 24, 28, 10
+    groups = [g for g in (("Which word changed", kinds), ("Worst phrases", phr)) if g[1]]
+    h = 16 + len(groups) * (ghead + gap) + sum(len(g[1]) for g in groups) * row + 26
+    x0, x1 = L, w - R
+    sx = lambda v: x0 + v * (x1 - x0)  # noqa: E731
+    out = []
+    for v in (0, 0.5, 1):
+        out.append(
+            f'<line x1="{sx(v):.1f}" y1="16" x2="{sx(v):.1f}" y2="{h - 24}" stroke="{c["separator1"]}"/>'
+        )
+        out.append(_text(sx(v), h - 8, f"{int(v * 100)}%", c["fg4"], 10.5, "middle", mono=True))
+    out.append(
+        f'<line x1="{sx(overall):.1f}" y1="16" x2="{sx(overall):.1f}" y2="{h - 24}" stroke="{c["fg2"]}" stroke-dasharray="3 3"/>'
+    )
+    out.append(
+        _text(sx(overall), h - 8, f"all {_pct(overall)}", c["fg2"], 10.5, "middle", mono=True)
+    )
+    y = 16
+    for title, items in groups:
+        out.append(_text(24, y + 16, title, c["fg2"], 11, caps=True))
+        y += ghead
+        for label, rate, (lo, hi) in items:
+            cy = y + row / 2
+            out.append(_text(L - 12, cy + 4, label, c["fg1"], 12.5, "end"))
+            out.append(_ci_bar(x0, sx, cy, rate, lo, hi, c["chart8"], c))
+            out.append(_text(x1 + 12, cy + 4, _pct(rate), c["chart8"], 12.5, mono=True, weight=600))
+            y += row
+        y += gap
+    return _svg(w, int(h), "".join(out), c)
+
+
+def alarm_sources(res: BenchResult, theme: str = "dark", w: int = 880) -> str:
+    """False alarms per hour by negative audio source."""
     c = PALETTE[theme]
     df = res.frame()
     ti = int(np.argmin(np.abs(THRESHOLDS - res.cfg.threshold)))
     neg = df[(df.label == 0) & (df.category != "adversarial")].copy()
     neg["ev"] = [e[ti] for e in neg.events]
     names = {
-        "speech": "TTS everyday speech",
+        "speech": "synthetic speech",
         "real_speech": "real conversation",
         "noise": "background noise",
     }
-    src = []
-    for cat, g in neg.groupby("category"):
-        hrs = g.duration_s.sum() / 3600
-        src.append((names.get(cat, cat), g.ev.sum() / max(hrs, 1e-9), hrs))
+    src = [
+        (names.get(k, k), g.ev.sum() / max(g.duration_s.sum() / 3600, 1e-9))
+        for k, g in neg.groupby("category")
+    ]
     src.sort(key=lambda r: -r[1])
-    adv = df[df.category == "adversarial"].copy()
-    adv["fa"] = [e[ti] > 0 for e in adv.events]
-    wake_words = [
-        p for wd in str(df.wake_word.iloc[0]).lower().split() for p in _split_unknown(wd, _cmu())
-    ]
-    adv["kind"] = adv.phrase.map(lambda p: _which_word(p, wake_words))
-    kinds = []
-    for k, g in adv.dropna(subset=["kind"]).groupby("kind"):
-        kinds.append((k, g.fa.mean(), wilson(float(g.fa.sum()), len(g)), len(g)))
-    kinds.sort(key=lambda r: -r[1])
-    phr = []
-    for p, g in adv.groupby("phrase"):
-        if len(g) >= 15:
-            phr.append((p, g.fa.mean(), wilson(float(g.fa.sum()), len(g)), len(g)))
-    phr.sort(key=lambda r: (-r[2][0], -r[1]))
-    phr = phr[:top]
-
-    half = (w - 72) / 2
-    row = 22
-    right_h = sum(10 + len(items) * row + 18 for items in (kinds, phr) if items)
-    h = 72 + max(len(src) * 34 + 30, right_h) + 16
-    out = [
-        f'<text x="24" y="26" fill="{c["fg1"]}" font-size="14" font-weight="600">What makes it fire · threshold {res.cfg.threshold:g}</text>',
-        f'<text x="24" y="44" fill="{c["fg3"]}" font-size="12">left: false alarms per hour by audio source · right: share of confusable clips accepted (95% CI)</text>',
-    ]
-    # left panel
-    X, Y = 24, 72
-    mx = max([r[1] for r in src] + [1e-9])
-    out.append(
-        f'<text x="{X}" y="{Y}" fill="{c["fg2"]}" font-family="{_e(MONO)}" font-size="11" letter-spacing="0.6">FALSE ALARMS / HOUR</text>'
-    )
-    for i, (name, fpph, hrs) in enumerate(src):
-        y = Y + 18 + i * 34
-        bw = (half - 150) * fpph / mx
-        out.append(f'<text x="{X}" y="{y + 12}" fill="{c["fg1"]}" font-size="12">{_e(name)}</text>')
+    L, R, row = 190, 64, 30
+    h = 16 + len(src) * row + 10
+    mx = max([v for _, v in src] + [1e-9])
+    out = []
+    for i, (name, v) in enumerate(src):
+        cy = 16 + i * row + row / 2
+        bw = (w - L - R - 60) * v / mx
+        out.append(_text(L - 12, cy + 4, name, c["fg1"], 12.5, "end"))
         out.append(
-            f'<text x="{X}" y="{y + 26}" fill="{c["fg4"]}" font-size="10.5">{hrs:.1f} h</text>'
+            f'<rect x="{L}" y="{cy - 8:.1f}" width="{max(bw, 1):.1f}" height="16" fill="{c["chart3"]}"/>'
         )
-        out.append(
-            f'<rect x="{X + 130}" y="{y + 4}" width="{max(bw, 1):.1f}" height="14" rx="3" fill="{c["chart3"]}" fill-opacity="0.9"/>'
-        )
-        out.append(
-            f'<text x="{X + 138 + bw:.1f}" y="{y + 15}" fill="{c["fg1"]}" font-family="{_e(MONO)}" font-size="12" font-weight="600">{fpph:.1f}</text>'
-        )
-    # right panel
-    X = 48 + half
-    x0, x1 = X + 150, X + half - 56
-    sx = lambda v: x0 + v * (x1 - x0)  # noqa: E731
-    y = Y
-    for title, items in (("WHICH PART IS IGNORED", kinds), ("WORST PHRASES (n ≥ 15)", phr)):
-        if not items:
-            continue
-        out.append(
-            f'<text x="{X}" y="{y}" fill="{c["fg2"]}" font-family="{_e(MONO)}" font-size="11" letter-spacing="0.6">{title}</text>'
-        )
-        y += 10
-        for label, rate, (lo, hi), n in items:
-            cy = y + row / 2
-            out.append(
-                f'<text x="{x0 - 10}" y="{cy + 4:.1f}" fill="{c["fg1"]}" font-size="12" text-anchor="end">{_e(label)}</text>'
-            )
-            out.append(
-                f'<rect x="{x0}" y="{cy - 6:.1f}" width="{max(sx(rate) - x0, 1):.1f}" height="12" rx="3" fill="{c["chart8"]}" fill-opacity="0.85"/>'
-            )
-            out.append(
-                f'<line x1="{sx(lo):.1f}" y1="{cy:.1f}" x2="{sx(hi):.1f}" y2="{cy:.1f}" stroke="{c["fg0"]}" stroke-width="1.2"/>'
-            )
-            out.append(
-                f'<text x="{x1 + 8}" y="{cy + 4:.1f}" fill="{c["fg1"]}" font-family="{_e(MONO)}" font-size="12" font-weight="600">{100 * rate:.0f}%</text>'
-            )
-            y += row
-        y += 18
+        out.append(_text(L + bw + 10, cy + 5, f"{v:.0f}/h", c["fg1"], 12.5, mono=True, weight=600))
     return _svg(w, int(h), "".join(out), c)
 
 
+def hstack(svgs: list[str], theme: str = "dark", gap: int = 1) -> str:
+    """Place SVGs side by side (separated by a hairline)."""
+    import re
+
+    c = PALETTE[theme]
+    sizes = [
+        tuple(int(v) for v in re.search(r'width="(\d+)" height="(\d+)"', s).groups()) for s in svgs
+    ]
+    w = sum(sz[0] for sz in sizes) + gap * (len(svgs) - 1)
+    h = max(sz[1] for sz in sizes)
+    body, x = [f'<rect width="{w}" height="{h}" fill="{c["separator1"]}"/>'], 0
+    for s, (sw, sh) in zip(svgs, sizes):
+        inner = re.sub(r"^<svg[^>]*>", "", s)[: -len("</svg>")]
+        body.append(f'<rect x="{x}" width="{sw}" height="{h}" fill="{c["bg1"]}"/>')
+        body.append(
+            f'<svg x="{x}" y="0" width="{sw}" height="{sh}" viewBox="0 0 {sw} {sh}">{inner}</svg>'
+        )
+        x += sw + gap
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" '
+        f'font-family="{_e(SANS)}">{"".join(body)}</svg>'
+    )
+
+
 def write_figures(res: BenchResult, out_dir: str | Path, prefix: str = "") -> list[Path]:
-    """scorecard / tradeoff / failures / false_alarms as <name>_{dark,light}.svg."""
+    """README charts as <name>_{dark,light}.svg."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     paths = []
+    readme_axes = ["text_form", "accent", "noise_bucket", "noise_type", "reverb"]
     for theme in ("dark", "light"):
         for name, svg in (
             ("scorecard", scorecard(res, theme)),
             ("tradeoff", tradeoff([res], theme)),
-            ("failures", failures(res, theme, significant_only=True)),
-            ("false_alarms", false_alarms(res, theme)),
+            ("failures", failures(res, theme, axes=readme_axes, significant_only=True)),
+            ("talker", recall_by_talker(res, theme)),
+            ("near_misses", near_misses(res, theme)),
+            ("alarm_sources", alarm_sources(res, theme)),
         ):
             p = out / f"{prefix}{name}_{theme}.svg"
             p.write_text(svg)

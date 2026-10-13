@@ -238,7 +238,7 @@ h3{{font-size:14px;font-weight:600;color:var(--fg0);margin:28px 0 10px}}
 .dim{{color:var(--fg4)}} .note{{color:var(--fg3);font-size:12.5px}} .accent{{color:var(--accent)}}
 .eyebrow{{font:500 11px {viz.MONO};letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}}
 .chart svg{{width:100%;height:auto;display:block;margin:8px 0}}
-.table-wrap{{overflow-x:auto;border:1px solid var(--separator1);border-radius:6px;background:var(--bg1)}}
+.table-wrap{{overflow-x:auto;border:1px solid var(--separator1);border-radius:0;background:var(--bg1)}}
 table{{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}}
 th{{font:500 10.5px/1.2 {viz.MONO};letter-spacing:.06em;text-transform:uppercase;color:var(--fg3);text-align:left;padding:10px 12px;border-bottom:1px solid var(--separator1);white-space:nowrap}}
 td{{padding:7px 12px;border-bottom:1px solid var(--separator1);color:var(--fg2);font-size:13px}}
@@ -246,24 +246,24 @@ td:first-child{{white-space:nowrap}} tr:last-child td{{border-bottom:0}} tbody t
 td.num{{text-align:right;white-space:nowrap;font-family:{viz.MONO};font-size:12.5px}}
 td.strong{{font-weight:600}}
 .ci{{color:var(--fg4);font-size:10.5px;margin-left:6px}}
-.deco{{display:inline-block;width:1.5px;height:12px;border-radius:1px;margin-right:8px;vertical-align:-1px}}
-.meter{{display:inline-block;width:56px;height:6px;border-radius:3px;background:var(--bg3);margin-right:8px;vertical-align:1px;overflow:hidden}}
+.deco{{display:inline-block;width:1.5px;height:12px;border-radius:0;margin-right:8px;vertical-align:-1px}}
+.meter{{display:inline-block;width:56px;height:6px;border-radius:0;background:var(--bg3);margin-right:8px;vertical-align:1px;overflow:hidden}}
 .meter i{{display:block;height:100%;background:var(--fg4)}}
 .meter.bad i{{background:var(--chart8)}} .meter.good i{{background:var(--success)}}
 .val.bad{{color:var(--chart8)}} .val.good{{color:var(--success)}}
-details{{border:1px solid var(--separator1);border-radius:6px;margin:8px 0;background:var(--bg1)}}
+details{{border:1px solid var(--separator1);border-radius:0;margin:8px 0;background:var(--bg1)}}
 details>summary{{cursor:pointer;padding:12px 14px;list-style:none}}
 details>summary::before{{content:'›';display:inline-block;margin-right:10px;color:var(--fg3);transition:transform .15s}}
 details[open]>summary::before{{transform:rotate(90deg)}}
 details .table-wrap{{border:0;border-top:1px solid var(--separator1);border-radius:0}}
 .cards{{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}}
-.card{{background:var(--bg1);border:1px solid var(--separator1);border-radius:6px;padding:12px}}
+.card{{background:var(--bg1);border:1px solid var(--separator1);border-radius:0;padding:12px}}
 .cardhead{{display:flex;justify-content:space-between;align-items:center;gap:8px}}
 .cardhead code{{font:11px {viz.MONO};color:var(--fg3)}}
 .score{{font:600 12px {viz.MONO};color:var(--fg0)}}
 .text{{margin:6px 0 8px;color:var(--fg1)}}
 .badges{{display:flex;flex-wrap:wrap;gap:4px}}
-.badge{{font:500 10px/1 {viz.MONO};letter-spacing:.04em;text-transform:uppercase;color:var(--fg3);border:1px solid var(--separator2);border-radius:4px;padding:4px 6px}}
+.badge{{font:500 10px/1 {viz.MONO};letter-spacing:.04em;text-transform:uppercase;color:var(--fg3);border:1px solid var(--separator2);border-radius:0;padding:4px 6px}}
 .trace{{width:100%;height:64px;margin-top:8px}} .trace .line{{fill:none;stroke:var(--accent);stroke-width:1.5}}
 .trace .thr{{stroke:var(--chart8);stroke-dasharray:4 3}} .trace .region{{fill:var(--accent);opacity:.14}}
 audio{{width:100%;height:32px;margin-top:8px}}
@@ -291,8 +291,14 @@ def render_report(
         body += [
             f"<h2>{_esc(r.detector)}</h2>",
             _themed(viz.scorecard, r),
+            "<h3>Recall by condition</h3>",
             _themed(viz.failures, r),
-            _themed(viz.false_alarms, r),
+            "<h3>Recall vs second-voice loudness</h3>",
+            _themed(viz.recall_by_talker, r),
+            "<h3>Near-miss phrases accepted</h3>",
+            _themed(viz.near_misses, r),
+            "<h3>False alarms by source</h3>",
+            _themed(viz.alarm_sources, r),
         ]
     body += [
         "<h2>All slices</h2>",
