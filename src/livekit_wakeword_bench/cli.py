@@ -67,7 +67,7 @@ def _parse_filters(filters: list[str]) -> dict[str, object]:
 def init(
     wake_word: str = typer.Argument(..., help='e.g. "hey jarvis"'),
     plan: str = typer.Option("build", help="LiveKit plan: build (5) / ship (20) / scale (50)"),
-    size: str = typer.Option("default", help="small (quick) / default"),
+    size: str = typer.Option("default", help="tiny / small / default split sizes"),
     out: Path | None = typer.Option(None, "--out", "-o", help="Config path (default: <name>.yaml)"),
     force: bool = typer.Option(False, help="Overwrite an existing file"),
 ) -> None:
