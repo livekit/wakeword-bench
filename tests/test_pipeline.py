@@ -1,0 +1,270 @@
+"""Offline end-to-end: synthetic dataset -> loader -> bench -> metrics -> report.
+
+The "wake word" is a 1 kHz tone; ToneDetector scores tone energy in a sliding window.
+"""
+
+from __future__ import annotations
+
+import math
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from livekit_wakeword_bench import (
+    Prediction,
+    SlidingWindowDetector,
+    WakeWordData,
+    evaluate,
+    run_detector,
+)
+from livekit_wakeword_bench.dataset import ShardWriter
+from livekit_wakeword_bench.mix import active_rms, place_and_mix
+from livekit_wakeword_bench.report import render_report
+from livekit_wakeword_bench.text import TextSampler, adversarial_phrases
+
+SR = 16000
+
+
+def tone(sec: float, f: float = 1000.0) -> np.ndarray:
+    t = np.arange(int(sec * SR)) / SR
+    return (0.5 * np.sin(2 * np.pi * f * t)).astype(np.float32)
+
+
+@pytest.fixture(scope="module")
+def ds_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    root = tmp_path_factory.mktemp("ds")
+    w = ShardWriter(root, "test", SR, shard_size=7)
+    rng = np.random.default_rng(0)
+    for i in range(10):  # positives: tone at 2.0-2.6 s
+        x = 0.01 * rng.standard_normal(int(3.5 * SR)).astype(np.float32)
+        x[2 * SR : int(2.6 * SR)] += tone(0.6)
+        w.add(
+            x,
+            {
+                "id": f"p{i}",
+                "label": 1,
+                "category": "positive",
+                "onset_s": 2.0,
+                "offset_s": 2.6,
+                "phrase_onset_s": 2.0,
+                "phrase_offset_s": 2.6,
+                "noise_bucket": "quiet" if i < 5 else "extreme",
+            },
+        )
+    for i in range(6):  # negatives: noise, one with a 500 Hz tone (should not trigger)
+        x = 0.01 * rng.standard_normal(int(10 * SR)).astype(np.float32)
+        if i == 0:
+            x[SR : 2 * SR] += tone(1.0, 500.0)
+        w.add(x, {"id": f"n{i}", "label": 0, "category": "noise", "noise_bucket": "noise_only"})
+    # One "hard" negative that does contain the tone -> one false alarm.
+    x = 0.01 * rng.standard_normal(int(5 * SR)).astype(np.float32)
+    x[2 * SR : int(2.6 * SR)] += tone(0.6)
+    w.add(
+        x,
+        {
+            "id": "adv0",
+            "label": 0,
+            "category": "adversarial",
+            "phrase": "tone",
+            "noise_bucket": "quiet",
+        },
+    )
+    w.flush()
+    return root
+
+
+def tone_detector() -> SlidingWindowDetector:
+    def score(win: np.ndarray) -> float:
+        seg = win[-int(0.4 * SR) :]
+        spec = np.abs(np.fft.rfft(seg))
+        freqs = np.fft.rfftfreq(len(seg), 1 / SR)
+        band = spec[(freqs > 950) & (freqs < 1050)].sum()
+        return float(min(1.0, band / (spec.sum() + 1e-9) * 3))
+
+    return SlidingWindowDetector(score, "tone", window_s=1.0, hop_s=0.05)
+
+
+def test_loader(ds_dir: Path) -> None:
+    data = WakeWordData(ds_dir, "test")
+    assert len(data) == 17
+    assert len(data.filter(category="positive", noise_bucket=["extreme"])) == 5
+    s = data[0]
+    assert s.audio.dtype == np.float32 and s.sample_rate == SR
+    x, y = data.windows(2.0).arrays()
+    assert x.shape == (17, 2 * SR) and y.sum() == 10
+    # window for positives ends shortly after the phrase
+    p = data.filter(category="positive").windows(1.0)[0]
+    assert np.abs(p.audio[-int(0.5 * SR) :]).max() > 0.3
+
+
+def test_bench(ds_dir: Path, tmp_path: Path) -> None:
+    data = WakeWordData(ds_dir, "test")
+    res = evaluate(run_detector(tone_detector(), data, progress=False), data, "tone")
+    s = res.summary()
+    a = s["at_threshold"]
+    assert a["recall"] == 1.0
+    assert s["n_negative"] == 7
+    # adversarial clips are excluded from FPPH and reported separately
+    assert a["false_accept_rate"] == 0.0 and a["fpph"] == 0.0
+    assert a["adversarial_false_accept_rate"] == 1.0
+    assert s["fpph_hours"] == pytest.approx(60 / 3600, abs=1e-3)
+    assert a["latency_ms_p50"] is not None and -600 < a["latency_ms_p50"] < 500
+    bd = res.breakdown()
+    assert {r["value"] for r in bd["positive/noise_bucket"]} == {"quiet", "extreme"}
+    assert bd["negative/adversarial_phrase"][0]["false_accept_rate"] == 1.0
+    f = res.failures()
+    assert [r["id"] for r in f["false_alarms"]] == ["adv0"]
+    out = res.save(tmp_path / "run")
+    from livekit_wakeword_bench import BenchResult
+
+    again = BenchResult.load(out)
+    assert again.summary()["at_threshold"] == a
+    html = render_report([res, again], tmp_path / "r.html", data=data).read_text()
+    assert "adv0" in html and "data:audio/wav;base64" in html
+
+
+def test_event_detector(ds_dir: Path) -> None:
+    class Oracle:
+        name = "oracle"
+
+        def detect(self, audio: np.ndarray, sample_rate: int) -> Prediction:
+            return (
+                Prediction.from_events([2.7])
+                if len(audio) == int(3.5 * SR)
+                else Prediction.from_events([])
+            )
+
+    data = WakeWordData(ds_dir, "test")
+    s = evaluate(run_detector(Oracle(), data, progress=False), data, "oracle").summary()
+    assert s["at_threshold"]["recall"] == 1.0 and s["at_threshold"]["fpph"] == 0.0
+    assert s["at_threshold"]["latency_ms_p50"] == pytest.approx(100, abs=1)
+
+
+def test_snr() -> None:
+    rng = np.random.default_rng(0)
+    speech = tone(1.0)
+    noise = rng.standard_normal(SR * 3).astype(np.float32)
+    m = place_and_mix(speech, noise, 5.0, SR, 0.5, 0.5, rng=rng)
+    n_part = m.audio[: int(0.5 * SR)]
+    snr = 20 * math.log10(active_rms(speech, SR) / np.sqrt(np.mean(n_part**2)))
+    assert abs(snr - 5.0) < 0.6
+
+
+def test_adversarial() -> None:
+    adv = dict(adversarial_phrases("hey livekit"))
+    assert "hey livekit" not in adv and "hey live kit" not in adv
+    assert "hey live kid" in adv and "hey kit" in adv
+    import random
+
+    ts = TextSampler("hey livekit", ["Hey LiveKit"], ["hey lifekit"], 1.0, random.Random(0))
+    u = ts.positive()
+    assert u.form.startswith("carrier") and "Hey LiveKit" in u.segments[u.key]
+
+
+def test_augmenter_exact_snr_and_chain() -> None:
+    """Scene mixing hits the requested SNR exactly (component-wise), and the device chain
+    records what it did."""
+    from livekit_wakeword_bench.augment import Augmenter, apply_codec
+    from livekit_wakeword_bench.config import AugmentSpec
+    from livekit_wakeword_bench.mix import active_rms
+
+    class Pool:
+        def __init__(self, x: np.ndarray) -> None:
+            self.x = x
+
+        def __bool__(self) -> bool:
+            return True
+
+        def sample(self, rng, sr=SR):  # noqa: ANN001
+            class It:
+                source, category, name = "fake", "street/fake", "f.flac"
+
+            return It(), self.x
+
+    class Pools:
+        def noise(self, pool):  # noqa: ANN001
+            return Pool(np.random.default_rng(1).standard_normal(SR * 4).astype(np.float32))
+
+        def rir(self, pool):  # noqa: ANN001
+            return None
+
+        def speech(self, pool):  # noqa: ANN001
+            return None
+
+    spec = AugmentSpec(snr_buckets={"only": (7.0, 7.0)}, clean_weight=0.0, p_second_noise=0.0)
+    aug = Augmenter(spec, Pools(), "test")
+    speech = tone(1.0)
+    canvas = np.concatenate([np.zeros(SR, np.float32), speech, np.zeros(SR, np.float32)])
+    meta: dict = {}
+    out = aug.scene(canvas, speech, np.random.default_rng(0), meta)
+    noise = out - canvas
+    snr = 20 * math.log10(active_rms(speech, SR) / np.sqrt(np.mean(noise**2)))
+    assert snr == pytest.approx(7.0, abs=1e-3)
+    assert meta["noise_bucket"] == "only" and meta["noise_type"] == "street"
+
+    full = AugmentSpec(p_eq=1.0, p_bandlimit=1.0, p_codec=1.0, p_clip=0.0)
+    meta2: dict = {}
+    y = Augmenter(full, Pools(), "test").device(out, np.random.default_rng(3), meta2)
+    assert len(y) == len(out) and np.isfinite(y).all()
+    assert meta2["eq"] and meta2["bandlimit"] != "none" and meta2["codec"] != "none"
+    for c in ("opus_8k", "mp3_32k", "mulaw_8khz"):
+        z = apply_codec(out * 0.3, SR, c)
+        assert len(z) == len(out) and np.corrcoef(z, out)[0, 1] > 0.5
+        # no codec delay: timestamps (phrase_onset_s / latency) must stay valid
+        cc = np.correlate(z[SR : 2 * SR], out[SR : 2 * SR] * 0.3, "full")
+        assert abs(int(np.argmax(cc)) - (SR - 1)) <= 2
+
+
+def test_phonetics() -> None:
+    from livekit_wakeword_bench.text import phonetic_distance
+
+    assert phonetic_distance("Hey, LiveKit!", "hey livekit") == 0
+    assert phonetic_distance("okay hey live kit call mom", "hey livekit") == 0
+    assert phonetic_distance("Hey life kid", "hey livekit") == 2
+    assert phonetic_distance("the weather is nice", "hey livekit") > 3
+    adv = dict(adversarial_phrases("hey livekit"))
+    # phrases that acoustically contain the wake word are not fair negatives
+    assert "hey live kits" not in adv and "hey live kitty" not in adv
+
+
+def test_phoneme_rendering() -> None:
+    """Pinned to the providers' documented examples."""
+    from livekit_wakeword_bench.phonemes import (
+        render_phrase,
+        supports_phonemes,
+        to_cartesia,
+        to_ipa,
+        to_rime,
+        word_arpabet,
+    )
+
+    # Cartesia docs: cat, today (stress before the onset), America, jambalaya, letter (ɝ)
+    assert to_cartesia(word_arpabet("cat")[0]) == "<<ˈ|k|æ|t>>"
+    assert to_cartesia(word_arpabet("today")[0]) == "<<t|ə|ˈ|d|eɪ>>"
+    assert to_cartesia(word_arpabet("america")[0]) == "<<ə|ˈ|m|ɛ|ɹ|ə|k|ə>>"
+    assert to_cartesia(word_arpabet("jambalaya")[0]) == "<<ˌ|dʒ|ə|m|b|ə|ˈ|l|aɪ|ə>>"
+    assert to_cartesia(word_arpabet("letter")[0]) == "<<ˈ|l|ɛ|t|ɝ>>"
+    # Rime docs: custom {k1Ast0xm}, comma {k1am0x}
+    assert to_rime(word_arpabet("custom")[0]) == "{k1Ast0xm}"
+    assert to_rime(word_arpabet("comma")[0]) == "{k1am0x}"
+    assert to_ipa(word_arpabet("crete")[0]) == "ˈkɹit"
+    ov = {"livekit": "L AY1 V | K IH2 T"}
+    assert render_phrase("Hey, LiveKit!", "rime/mistv3", ov) == "{h1e}, {l1Yv} {k1It}!"
+    assert render_phrase("Hey, LiveKit!", "inworld/inworld-tts-2", ov) == "/ˈheɪ/, /ˈlaɪvˌkɪt/!"
+    assert render_phrase("Hey xyzzyq", "cartesia/sonic-3") is None  # unknown word
+    assert supports_phonemes("rime/mistv3") and not supports_phonemes("rime/coda")
+    assert not supports_phonemes("deepgram/aura-2") and not supports_phonemes("fishaudio/s2-pro")
+
+
+def test_silent_model_scores_zero(ds_dir: Path) -> None:
+    class Silent:
+        name = "silent"
+
+        def detect(self, audio: np.ndarray, sample_rate: int) -> Prediction:
+            t = np.arange(1, len(audio) // 1280 + 1) * 0.08
+            return Prediction(t, np.zeros_like(t))
+
+    data = WakeWordData(ds_dir, "test")
+    s = evaluate(run_detector(Silent(), data, progress=False), data, "silent").summary()
+    assert s["score"] == 0.0 and s["curve"]["recall"][0] == 0.0

@@ -1,0 +1,20 @@
+# Tiny end-to-end run (~2 min): lkwb generate -c configs/smoke.yaml -o out/smoke
+name: hey_livekit_smoke
+wake_word: hey livekit
+# exact pronunciation (ARPAbet; "|" separates morphemes): /ˈlaɪvˌkɪt/
+pronunciations:
+  livekit: "L AY1 V | K IH2 T"
+tts:
+  plan: build   # 5 concurrent TTS connections; raise to ship / scale if your plan allows
+splits:
+  train:
+    n_positive: 20
+    n_adversarial: 20
+    n_speech: 5
+    augment: false
+  test:
+    n_positive: 60
+    n_adversarial: 60
+    n_speech: 20
+    real_speech_minutes: 3
+    n_noise: 10

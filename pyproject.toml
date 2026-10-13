@@ -1,0 +1,75 @@
+[project]
+name = "livekit-wakeword-bench"
+version = "0.1.0"
+description = "Generate wake word datasets (LiveKit Inference TTS + real noise) and benchmark any wake word model"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Binh Pham", email = "binh.pham@livekit.io" }]
+requires-python = ">=3.12"
+keywords = ["wake-word", "keyword-spotting", "benchmark", "dataset", "tts", "livekit"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "aiohttp>=3.14.5",
+    "datasets>=3",
+    "huggingface-hub>=2.2.0",
+    "livekit-agents>=1.2",
+    "numpy>=2.5.4",
+    "pandas>=3.0.6",
+    "pronouncing>=0.3.0",
+    "pyarrow>=26.0.0",
+    "pydantic>=2.14.1",
+    "python-dotenv>=1.2.4",
+    "pyyaml>=6.0.3",
+    "rich>=15.0.0",
+    "scipy>=1.18.1",
+    "soundfile>=0.14.0",
+    "tqdm>=4.70.1",
+    "typer>=0.27.3",
+    "wordfreq>=3.1.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/livekit/wakeword-bench"
+Repository = "https://github.com/livekit/wakeword-bench"
+Dataset = "https://huggingface.co/datasets/binhpham/wakeword-bench-hey-livekit"
+
+[project.scripts]
+lkwb = "livekit_wakeword_bench.cli:app"
+
+[project.optional-dependencies]
+torch = ["torch>=2.2"]
+livekit = ["livekit-wakeword>=0.3.0"]
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "faster-whisper>=1.2.1",
+    "matplotlib>=3.11.2",
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

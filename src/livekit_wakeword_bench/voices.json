@@ -1,0 +1,1014 @@
+{
+ "cartesia/sonic-3": [
+  {
+   "id": "a167e0f3-df7e-4d52-a9c3-f949145efdab",
+   "name": "Blake",
+   "gender": "male",
+   "accent": "US"
+  },
+  {
+   "id": "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
+   "name": "Jacqueline",
+   "gender": "female",
+   "accent": "US"
+  },
+  {
+   "id": "f31cc6a7-c1e8-4764-980c-60a361443dd1",
+   "name": "Robyn",
+   "gender": "female",
+   "accent": "AU"
+  },
+  {
+   "id": "5c5ad5e7-1020-476b-8b91-fdcbe9cc313c",
+   "name": "Daniela",
+   "gender": "female",
+   "accent": "es-MX (Spanish)"
+  },
+  {
+   "id": "f786b574-daa5-4673-aa0c-cbe3e8534c02",
+   "name": "Katie",
+   "gender": "female",
+   "accent": "US"
+  },
+  {
+   "id": "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4",
+   "name": "Skylar",
+   "gender": "female",
+   "accent": "US"
+  },
+  {
+   "id": "47c38ca4-5f35-497b-b1a3-415245fb35e1",
+   "name": "Daniel",
+   "gender": "male",
+   "accent": "US"
+  },
+  {
+   "id": "a5136bf9-224c-4d76-b823-52bd5efcffcc",
+   "name": "Jameson",
+   "gender": "male",
+   "accent": "US"
+  },
+  {
+   "id": "62ae83ad-4f6a-430b-af41-a9bede9286ca",
+   "name": "Gemma",
+   "gender": "female",
+   "accent": "UK"
+  },
+  {
+   "id": "ef191366-f52f-447a-a398-ed8c0f2943a1",
+   "name": "Archie",
+   "gender": "male",
+   "accent": "UK"
+  },
+  {
+   "id": "0834f3df-e650-4766-a20c-5a93a43aa6e3",
+   "name": "Leo",
+   "gender": null,
+   "accent": null
+  },
+  {
+   "id": "6776173b-fd72-460d-89b3-d85812ee518d",
+   "name": "Jace",
+   "gender": null,
+   "accent": null
+  },
+  {
+   "id": "c961b81c-a935-4c17-bfb3-ba2239de8c2f",
+   "name": "Kyle",
+   "gender": null,
+   "accent": null
+  },
+  {
+   "id": "f4a3a8e4-694c-4c45-9ca0-27caf97901b5",
+   "name": "Gavin",
+   "gender": null,
+   "accent": null
+  },
+  {
+   "id": "cbaf8084-f009-4838-a096-07ee2e6612b1",
+   "name": "Maya",
+   "gender": null,
+   "accent": null
+  },
+  {
+   "id": "6ccbfb76-1fc6-48f7-b71d-91ac6298247b",
+   "name": "Tessa",
+   "gender": null,
+   "accent": null
+  },
+  {
+   "id": "cc00e582-ed66-4004-8336-0175b85c85f6",
+   "name": "Dana",
+   "gender": null,
+   "accent": null
+  },
+  {
+   "id": "26403c37-80c1-4a1a-8692-540551ca2ae5",
+   "name": "Marian",
+   "gender": null,
+   "accent": null
+  },
+  {
+   "id": "694f9389-aac1-45b6-b726-9d9369183238",
+   "name": "Sarah",
+   "gender": "female",
+   "accent": "US"
+  },
+  {
+   "id": "a0e99841-438c-4a64-b679-ae501e7d6091",
+   "name": "Barbershop Man",
+   "gender": "male",
+   "accent": "US"
+  },
+  {
+   "id": "79a125e8-cd45-4c13-8a67-188112f4dd22",
+   "name": "British Lady",
+   "gender": "female",
+   "accent": "UK"
+  },
+  {
+   "id": "a01c369f-6d2d-4185-bc20-b32c225eab70",
+   "name": "British Customer Support Lady",
+   "gender": "female",
+   "accent": "UK"
+  },
+  {
+   "id": "63ff761f-c1e8-414b-b969-d1833d1c870c",
+   "name": "Confident British Man",
+   "gender": "male",
+   "accent": "UK"
+  },
+  {
+   "id": "95856005-0332-41b0-935f-352e296aa0df",
+   "name": "Classy British Man",
+   "gender": "male",
+   "accent": "UK"
+  },
+  {
+   "id": "638efaaa-4d0c-442e-b701-3fae16aad012",
+   "name": "Indian Man",
+   "gender": "male",
+   "accent": "Indian"
+  },
+  {
+   "id": "ff1bb1a9-c582-4570-9670-5f46169d0fc8",
+   "name": "Indian Customer Support Lady",
+   "gender": "female",
+   "accent": "Indian"
+  },
+  {
+   "id": "95d51f79-c397-46f9-b49a-23763d3eaa2d",
+   "name": "Hinglish Speaking Lady",
+   "gender": "female",
+   "accent": "Indian (Hinglish)"
+  },
+  {
+   "id": "41f3c367-e0a8-4a85-89e0-c27bae9c9b6d",
+   "name": "Australian Customer Support Man",
+   "gender": "male",
+   "accent": "AU"
+  },
+  {
+   "id": "421b3369-f63f-4b03-8980-37a44df1d4e8",
+   "name": "Friendly Australian Man",
+   "gender": "male",
+   "accent": "AU"
+  },
+  {
+   "id": "8985388c-1332-4ce7-8d55-789628aa3df4",
+   "name": "Australian Narrator Lady",
+   "gender": "female",
+   "accent": "AU"
+  },
+  {
+   "id": "043cfc81-d69f-4bee-ae1e-7862cb358650",
+   "name": "Australian Woman",
+   "gender": "female",
+   "accent": "AU"
+  },
+  {
+   "id": "34575e71-908f-4ab6-ab54-b08c95d6597d",
+   "name": "New York Man",
+   "gender": "male",
+   "accent": "US (New York)"
+  },
+  {
+   "id": "34bde396-9fde-4ebf-ad03-e3a1d1155205",
+   "name": "New York Woman",
+   "gender": "female",
+   "accent": "US (New York)"
+  },
+  {
+   "id": "98a34ef2-2140-4c28-9c71-663dc4dd7022",
+   "name": "Southern Man",
+   "gender": "male",
+   "accent": "US (Southern)"
+  },
+  {
+   "id": "f9836c6e-a0bd-460e-9d3c-f7299fa60f94",
+   "name": "Southern Woman",
+   "gender": "female",
+   "accent": "US (Southern)"
+  },
+  {
+   "id": "565510e8-6b45-45de-8758-13588fbaec73",
+   "name": "Midwestern Man",
+   "gender": "male",
+   "accent": "US (Midwest)"
+  },
+  {
+   "id": "11af83e2-23eb-452f-956e-7fee218ccb5c",
+   "name": "Midwestern Woman",
+   "gender": "female",
+   "accent": "US (Midwest)"
+  },
+  {
+   "id": "b7d50908-b17c-442d-ad8d-810c63997ed9",
+   "name": "California Girl",
+   "gender": "female",
+   "accent": "US (California)"
+  },
+  {
+   "id": "829ccd10-f8b3-43cd-b8a0-4aeaa81f3b30",
+   "name": "Customer Support Lady",
+   "gender": "female",
+   "accent": "US"
+  },
+  {
+   "id": "daf747c6-6bc2-4083-bd59-aa94dce23f5d",
+   "name": "Middle Eastern Woman",
+   "gender": "female",
+   "accent": "Middle Eastern"
+  },
+  {
+   "id": "15d0c2e2-8d29-44c3-be23-d585d5f154a1",
+   "name": "Mexican Man",
+   "gender": "male",
+   "accent": "Mexican"
+  },
+  {
+   "id": "fb9fcab6-aba5-49ec-8d7e-3f1100296dde",
+   "name": "Friendly German Man",
+   "gender": "male",
+   "accent": "German"
+  },
+  {
+   "id": "ab7c61f5-3daa-47dd-a23b-4ac0aac5f5c3",
+   "name": "Friendly French Man",
+   "gender": "male",
+   "accent": "French"
+  }
+ ],
+ "inworld/inworld-tts-2": [
+  {
+   "id": "Ashley",
+   "name": "Ashley",
+   "gender": "female",
+   "accent": "US"
+  },
+  {
+   "id": "Edward",
+   "name": "Edward",
+   "gender": "male",
+   "accent": "US"
+  },
+  {
+   "id": "Olivia",
+   "name": "Olivia",
+   "gender": "female",
+   "accent": "UK"
+  },
+  {
+   "id": "Alex",
+   "name": "Alex",
+   "gender": "male",
+   "accent": null
+  },
+  {
+   "id": "Blake",
+   "name": "Blake",
+   "gender": "male",
+   "accent": null
+  },
+  {
+   "id": "Carter",
+   "name": "Carter",
+   "gender": "male",
+   "accent": null
+  },
+  {
+   "id": "Clive",
+   "name": "Clive",
+   "gender": "male",
+   "accent": "UK"
+  },
+  {
+   "id": "Craig",
+   "name": "Craig",
+   "gender": "male",
+   "accent": "UK"
+  },
+  {
+   "id": "Deborah",
+   "name": "Deborah",
+   "gender": "female",
+   "accent": null
+  },
+  {
+   "id": "Dennis",
+   "name": "Dennis",
+   "gender": "male",
+   "accent": null
+  },
+  {
+   "id": "Dominus",
+   "name": "Dominus",
+   "gender": "male",
+   "accent": null
+  },
+  {
+   "id": "Elizabeth",
+   "name": "Elizabeth",
+   "gender": "female",
+   "accent": null
+  },
+  {
+   "id": "Hades",
+   "name": "Hades",
+   "gender": "male",
+   "accent": null
+  },
+  {
+   "id": "Hana",
+   "name": "Hana",
+   "gender": "female",
+   "accent": null
+  },
+  {
+   "id": "Julia",
+   "name": "Julia",
+   "gender": "female",
+   "accent": null
+  },
+  {
+   "id": "Luna",
+   "name": "Luna",
+   "gender": "female",
+   "accent": null
+  },
+  {
+   "id": "Mark",
+   "name": "Mark",
+   "gender": "male",
+   "accent": null
+  },
+  {
+   "id": "Pixie",
+   "name": "Pixie",
+   "gender": "female",
+   "accent": null
+  },
+  {
+   "id": "Priya",
+   "name": "Priya",
+   "gender": "female",
+   "accent": "Indian"
+  },
+  {
+   "id": "Ronald",
+   "name": "Ronald",
+   "gender": "male",
+   "accent": "UK"
+  },
+  {
+   "id": "Sarah",
+   "name": "Sarah",
+   "gender": "female",
+   "accent": null
+  },
+  {
+   "id": "Shaun",
+   "name": "Shaun",
+   "gender": "male",
+   "accent": null
+  },
+  {
+   "id": "Theodore",
+   "name": "Theodore",
+   "gender": "male",
+   "accent": null
+  },
+  {
+   "id": "Timothy",
+   "name": "Timothy",
+   "gender": "male",
+   "accent": "US"
+  },
+  {
+   "id": "Wendy",
+   "name": "Wendy",
+   "gender": "female",
+   "accent": "UK"
+  },
+  {
+   "id": "Diego",
+   "name": "Diego",
+   "gender": "male",
+   "accent": "es-MX (Spanish)"
+  }
+ ],
+ "xai/tts-1": [
+  {
+   "id": "ara",
+   "name": "Ara",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "eve",
+   "name": "Eve",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "leo",
+   "name": "Leo",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "rex",
+   "name": "Rex",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "sal",
+   "name": "Sal",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "carina",
+   "name": "Carina",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "zagan",
+   "name": "Zagan",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "helix",
+   "name": "Helix",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "orion",
+   "name": "Orion",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "luna",
+   "name": "Luna",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "iris",
+   "name": "Iris",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "altair",
+   "name": "Altair",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "zenith",
+   "name": "Zenith",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "perseus",
+   "name": "Perseus",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "helios",
+   "name": "Helios",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "lux",
+   "name": "Lux",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "kepler",
+   "name": "Kepler",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "rigel",
+   "name": "Rigel",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "cosmo",
+   "name": "Cosmo",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "celeste",
+   "name": "Celeste",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "ursa",
+   "name": "Ursa",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "sirius",
+   "name": "Sirius",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "lumen",
+   "name": "Lumen",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "castor",
+   "name": "Castor",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "naksh",
+   "name": "Naksh",
+   "gender": null,
+   "accent": "US"
+  },
+  {
+   "id": "atlas",
+   "name": "Atlas",
+   "gender": null,
+   "accent": "US"
+  }
+ ],
+ "rime/mistv3": [
+  {
+   "id": "astra",
+   "name": "Astra",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "cove",
+   "name": "Cove",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US (African American)"
+  },
+  {
+   "id": "estelle",
+   "name": "Estelle",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "lagoon",
+   "name": "Lagoon",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "luna",
+   "name": "Luna",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "mari",
+   "name": "Mari",
+   "gender": "female",
+   "accent": "DO",
+   "accent_detail": "Dominican Republic (Caribbean)"
+  },
+  {
+   "id": "moon",
+   "name": "Moon",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US (African American)"
+  },
+  {
+   "id": "moraine",
+   "name": "Moraine",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "peak",
+   "name": "Peak",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "sirius",
+   "name": "Sirius",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "summit",
+   "name": "Summit",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "talon",
+   "name": "Talon",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "thunder",
+   "name": "Thunder",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "tundra",
+   "name": "Tundra",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US (African American)"
+  },
+  {
+   "id": "vespera",
+   "name": "Vespera",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "wildflower",
+   "name": "Wildflower",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US (Asian American)"
+  },
+  {
+   "id": "alexis",
+   "name": "Alexis",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "alpine",
+   "name": "Alpine",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (Latino)"
+  },
+  {
+   "id": "bayou",
+   "name": "Bayou",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "blaze",
+   "name": "Blaze",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "blossom",
+   "name": "Blossom",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "boulder",
+   "name": "Boulder",
+   "gender": "non-binary",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "breeze",
+   "name": "Breeze",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "brook",
+   "name": "Brook",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (African American)"
+  },
+  {
+   "id": "cedar",
+   "name": "Cedar",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "creek",
+   "name": "Creek",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (African American)"
+  },
+  {
+   "id": "dew",
+   "name": "Dew",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "ember",
+   "name": "Ember",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "falcon",
+   "name": "Falcon",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "fjord",
+   "name": "Fjord",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "flower",
+   "name": "Flower",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (African American)"
+  },
+  {
+   "id": "glacier",
+   "name": "Glacier",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "granite",
+   "name": "Granite",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "grove",
+   "name": "Grove",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "gulch",
+   "name": "Gulch",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "hawk",
+   "name": "Hawk",
+   "gender": "male",
+   "accent": "IN",
+   "accent_detail": "US (Indian)"
+  },
+  {
+   "id": "iris",
+   "name": "Iris",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US (Latino)"
+  },
+  {
+   "id": "ironwood",
+   "name": "Ironwood",
+   "gender": "male",
+   "accent": "IN",
+   "accent_detail": "US (Indian)"
+  },
+  {
+   "id": "jose",
+   "name": "Jose",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (Latino)"
+  },
+  {
+   "id": "jungle",
+   "name": "Jungle",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (Southern)"
+  },
+  {
+   "id": "karst",
+   "name": "Karst",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "loquat",
+   "name": "Loquat",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (Southern)"
+  },
+  {
+   "id": "lotus",
+   "name": "Lotus",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US (Latino)"
+  },
+  {
+   "id": "marsh",
+   "name": "Marsh",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (African American)"
+  },
+  {
+   "id": "mesa",
+   "name": "Mesa",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "pablo",
+   "name": "Pablo",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (Latino)"
+  },
+  {
+   "id": "pearl",
+   "name": "Pearl",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "petal",
+   "name": "Petal",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "pola",
+   "name": "Pola",
+   "gender": "female",
+   "accent": "DO",
+   "accent_detail": "US (Dominican)"
+  },
+  {
+   "id": "rain",
+   "name": "Rain",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "rainforest",
+   "name": "Rainforest",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US (Latino)"
+  },
+  {
+   "id": "river",
+   "name": "River",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (Latino)"
+  },
+  {
+   "id": "runton",
+   "name": "Runton",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "spore",
+   "name": "Spore",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "steppe",
+   "name": "Steppe",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "stone",
+   "name": "Stone",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (Latino)"
+  },
+  {
+   "id": "storm",
+   "name": "Storm",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (Latino)"
+  },
+  {
+   "id": "stream",
+   "name": "Stream",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "violet",
+   "name": "Violet",
+   "gender": "non-binary",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "willow",
+   "name": "Willow",
+   "gender": "female",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "wolf",
+   "name": "Wolf",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US"
+  },
+  {
+   "id": "zion",
+   "name": "Zion",
+   "gender": "male",
+   "accent": "US",
+   "accent_detail": "US (African American)"
+  }
+ ]
+}
