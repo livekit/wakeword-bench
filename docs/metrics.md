@@ -1,6 +1,8 @@
 # Metrics
 
-A wake word model has two jobs: wake up on the wake word, and stay quiet otherwise. Every number below measures one of those jobs, or the cost of doing them.
+A developer lowers the detection threshold and sees more wake words get through. That looks like progress—until ordinary conversation starts waking the device too.
+
+Recall tells only half of that story. Read it alongside false alarms, then use the benchmark score to compare models at the same false-alarm target.
 
 ## The score
 
@@ -8,7 +10,7 @@ A wake word model has two jobs: wake up on the wake word, and stay quiet otherwi
 score = recall at the lowest threshold where false alarms per hour ≤ 0.5
 ```
 
-An always-listening device that wakes up by itself more than about once every two hours annoys people, so the benchmark asks: *keeping false alarms at or below 0.5 per hour, how many wake words does the model catch?* Higher is better. Change the target with `--score-fpph` (CLI) or `BenchConfigRun(score_fpph=...)`.
+The default target is one false alarm every two hours of negative audio. At that rate, what fraction of wake words does the model catch? Higher is better. Choose a different target for your application with `--score-fpph` (CLI) or `BenchConfigRun(score_fpph=...)`.
 
 The score is computed from a sweep over 101 thresholds (0.00, 0.01, … 1.00). For each threshold the benchmark measures recall and false alarms per hour; the score is the recall at the lowest threshold that meets the target.
 
@@ -53,7 +55,7 @@ In the report and charts, a condition is colored **only when its confidence inte
 
 ## What the numbers do and do not tell you
 
-- **Wake words are synthetic.** They come from TTS, not people. The differences between conditions are the reliable signal; absolute recall on real users will differ.
+- **Wake words are synthetic.** They come from TTS, not people. Differences between conditions can suggest what to investigate, but neither those differences nor absolute recall establish performance on real users.
 - **Rare false alarms need many hours.** The public test set has 6.1 hours of negative audio. Zero false alarms in 6.1 hours only bounds the true rate at ≤ 0.49 per hour (95% confidence). It cannot separate 0.5 from 0.1 per hour.
 - **Accent labels** come from TTS provider metadata.
 - **Compare like with like.** Compare runs on the same dataset, split and `--limit`.

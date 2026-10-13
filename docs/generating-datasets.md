@@ -1,6 +1,8 @@
 # Generating datasets
 
-The generator builds a complete wake word dataset (train, validation and test splits) for any phrase. Speech comes from [LiveKit Inference](https://docs.livekit.io/agents/models/tts/inference/) text-to-speech; real noise, rooms and other talkers are mixed in afterwards. Every clip keeps its full recipe, so results can be broken down by condition.
+You've picked a wake word and recorded yourself saying it a few times. That is enough to try a detector, but it leaves a lot untested: other speakers, background conversation, different rooms and phrases that sound almost right.
+
+The generator builds those examples using [LiveKit Inference](https://docs.livekit.io/agents/models/tts/inference/) speech and recorded noise, room responses and conversation. Start with a small dataset, check the pronunciation, then expand it or generate training examples for a weakness you've measured. Each clip keeps the recipe used to make it.
 
 ## 1. Connect a LiveKit Cloud project
 
@@ -23,7 +25,7 @@ lk app env -w      # writes LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET to 
 
 ## 2. Pick your plan
 
-LiveKit Inference limits how many TTS connections can run at once, per [plan](https://livekit.com/pricing). The generator never exceeds the limit you give it.
+LiveKit Inference limits how many TTS connections can run at once, per [plan](https://livekit.com/pricing). Choose the plan that matches your account. The generator uses the configured limit; it doesn't check your account's allowance.
 
 | plan | flag | concurrent TTS | rough speed |
 |---|---|---|---|
@@ -32,18 +34,18 @@ LiveKit Inference limits how many TTS connections can run at once, per [plan](ht
 | Scale | `--plan scale` | 50 | ~30 utterances/s |
 | Enterprise | `--set tts.concurrency=N` | your limit | |
 
-You can also set `tts.plan` in a config file, or the `LKWB_TTS_CONCURRENCY` environment variable. All splits share one connection budget, so they synthesize in parallel without going over the limit.
+Set `tts.plan` in a config file, or override the connection count with `LKWB_TTS_CONCURRENCY`. Never set concurrency above your account limit. All splits share one connection budget, so they synthesize in parallel without going over the limit.
 
 ## 3. Generate
 
 ```bash
-uv run lkwb generate "hey jarvis" --size small --plan ship -o out/hey_jarvis
+uv run lkwb generate "hey jarvis" --size small --plan build -o out/hey_jarvis
 ```
 
 ```python
 from livekit_wakeword_bench import generate
 
-generate("hey jarvis", "out/hey_jarvis", size="small", plan="ship")
+generate("hey jarvis", "out/hey_jarvis", size="small", plan="build")
 ```
 
 `--size` sets how many clips each split gets:
@@ -63,7 +65,7 @@ uv run lkwb generate "hey jarvis" -o out/hey_jarvis --size small \
 
 ## What gets generated
 
-Each split contains five kinds of clips:
+The dataset supports five kinds of clips. The split settings determine how many of each are generated:
 
 | category | label | what it is |
 |---|---|---|
@@ -85,7 +87,7 @@ Each split contains five kinds of clips:
 
 ## Pronunciation
 
-Wake words are sent to TTS as phonemes, so every voice says them the same way. Words in the CMU dictionary need nothing. Brand names and made-up words need an entry:
+Wake words are sent to TTS as phonemes to specify the intended pronunciation. Dictionary words are handled automatically; check the generated config for brand names and invented words:
 
 ```bash
 uv run lkwb init "ok zorblax"                # writes ok_zorblax.yaml with a TODO for "zorblax"
@@ -107,8 +109,8 @@ The config holds the wake word, pronunciations, phrasing, hard negatives, plan a
 
 ## Caching and reproducibility
 
-- **TTS is cached** in `.cache/lkwb/tts`, keyed by provider, voice, text and speed. Regenerating with different augmentation, sizes that reuse the same utterances, or a different output directory costs nothing.
-- **Generation is deterministic** for a given config and `seed`: the same config produces the same dataset.
+- **TTS is cached** in `.cache/lkwb/tts`, keyed by provider, voice, text and speed. Requests already in the cache incur no new TTS charge. Changes that require new utterances still spend inference credits.
+- **Sampling and augmentation use a seed.** Keep the config, cached TTS and audio sources to reproduce a run; a seed alone cannot guarantee identical output from an external TTS service.
 - **Audio sources** (noise, rooms, real speech) are downloaded from Hugging Face on first use into `.cache/lkwb/sources`. Prefetch them with `lkwb sources`.
 - **Splits** can be generated separately with `--split train` / `--split test`. Existing shards for a split are kept unless you pass `--overwrite`.
 

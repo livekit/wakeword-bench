@@ -1,6 +1,8 @@
 # Dataset format
 
-A dataset is a folder of Hugging Face parquet shards. The same layout works locally and on the Hub, so any dataset can be loaded by path or by repo id.
+If you're investigating a missed wake word, the audio alone won't tell you how the clip was made. Each row stores the audio alongside its phrase, voice, timing and augmentation settings.
+
+Datasets use Parquet shards, with the same layout locally and on the Hugging Face Hub. Load one by directory path or repo id:
 
 ```
 my_dataset/
@@ -15,7 +17,7 @@ my_dataset/
 
 ## Loading it
 
-With this library (decodes audio itself, no extra dependencies):
+Use `WakeWordData` to decode clips and access their metadata:
 
 ```python
 from livekit_wakeword_bench import WakeWordData
@@ -101,7 +103,7 @@ Every row has every column. When a column doesn't apply it holds `""`, `NaN`, `-
 | `level_dbfs` | float | peak level of the clip |
 | `clipping` | bool | input overdriven |
 | `codec` | str | `none`, `opus_8k`, `opus_16k`, `opus_32k`, `mp3_32k`, `mulaw_8khz` |
-| `augmentations` | str | everything that fired, e.g. `reverb+talker+noise` |
+| `augmentations` | str | effects applied, e.g. `reverb+talker+noise` |
 
 The authoritative list is `SCHEMA` in [`src/livekit_wakeword_bench/dataset.py`](../src/livekit_wakeword_bench/dataset.py).
 

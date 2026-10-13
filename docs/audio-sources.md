@@ -1,11 +1,13 @@
 # Audio sources
 
-Background noise, room acoustics and real conversation come from public datasets on the Hugging Face Hub. They are split into two pools that never share audio:
+When you add café noise to training, the test should use different recordings. Otherwise, a better score may reflect familiarity with that café rather than an ability to handle a new one.
+
+The generator draws noise, room impulse responses and recorded speech from public datasets on the Hugging Face Hub. It keeps two separate pools:
 
 - the **train pool** feeds the train and validation splits and `Augment()`;
 - the **test pool** feeds the test split only.
 
-A model is never tested on the noise recordings, rooms or real speakers it trained with, so the benchmark measures how well it generalizes. MUSAN and the MIT room recordings are what livekit-wakeword trains on, so they are train-only.
+This separation prevents reuse of those sources within the generation and training workflow. If your model was trained elsewhere, check its training sources too. MUSAN and the MIT room recordings are assigned to the train pool because livekit-wakeword uses them for training.
 
 ## Sources
 
@@ -29,13 +31,13 @@ Real speech is used two ways: as `real_speech` negative clips (the main false-al
 
 ## Licensing
 
-WHAM!, ESC-50, Treble10 and GTZAN are non-commercial or research-only. That is fine for benchmarking. For a dataset you plan to use commercially, restrict the sources:
+WHAM!, ESC-50, Treble10 and GTZAN have non-commercial or research-only restrictions. Use `sources` to exclude them, for example:
 
 ```yaml
 sources: [musan_noise, dns_noise, mit_rir, librispeech, demand, slr28_rir, ami, earnings22, peoples_speech]
 ```
 
-The dataset card written by `lkwb generate` lists the sources each dataset used.
+The generated dataset card lists the sources used. The filter above excludes those four sources; check the remaining source licenses for your intended use.
 
 ## Noise categories
 

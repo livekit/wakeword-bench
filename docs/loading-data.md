@@ -1,6 +1,6 @@
 # Loading data
 
-`WakeWordData` is a lazy, filterable view over one split of a dataset. Audio is decoded only when you access a clip, and every operation returns a new view.
+You can inspect which clips contain loud noise without decoding hours of audio, then load just those clips to listen or train. `WakeWordData` reads metadata first and decodes audio when you access a sample. Filtering, shuffling and windowing return new views.
 
 ```python
 from livekit_wakeword_bench import DEFAULT_DATASET, WakeWordData
@@ -58,7 +58,7 @@ train = WakeWordData(DEFAULT_DATASET, split="train").with_transform(Augment()).w
 
 The first use downloads the training sources (a few GB). Each DataLoader worker loads its own copy lazily.
 
-Any function `fn(audio, meta, rng) -> audio` works as a transform, so you can chain your own augmentation the same way.
+A custom transform takes `fn(audio, meta, rng) -> audio`. Pass it to `with_transform()`. Calling `with_transform()` again replaces the previous transform; combine multiple effects inside one function if you need them together.
 
 ## PyTorch
 
@@ -88,6 +88,6 @@ uv run lkwb export-wav out/hey_jarvis exported/ --split test
 
 `export-livekit` writes the train split as `*_train` and the validation split as `*_test`, cropped to the spoken utterance. Negatives include near-miss phrases and everyday speech. Run livekit-wakeword's augment and train steps on that folder as usual.
 
-## Rule
+## Keep evaluation separate
 
-Never train on the `test` split or on test sources. The benchmark only measures generalization if the model has never heard those voices, rooms or recordings.
+Use `train` for fitting the model and `validation` for development checks. Never train on the `test` split or test sources. Keep that split fixed so [benchmark comparisons](benchmarking.md#comparing-two-models) measure changes to the model on held-out audio.

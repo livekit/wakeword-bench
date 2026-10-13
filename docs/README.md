@@ -1,6 +1,8 @@
 # Documentation
 
-Each page covers one part of LiveKit WakeWord Bench. Start with the guide that matches what you want to do.
+Suppose your model catches a wake word in a quiet room but misses it when someone else is talking. You need to find out how often that happens, build training data that addresses it, and check whether the next model does better.
+
+These guides follow that workflow. Start with [Benchmarking](benchmarking.md) if you already have a model. If you need data for a new wake word, start with [Generating datasets](generating-datasets.md).
 
 | I want to… | Read |
 |---|---|
@@ -18,17 +20,11 @@ Each page covers one part of LiveKit WakeWord Bench. Start with the guide that m
 
 Coding agents should also read [AGENTS.md](../AGENTS.md), which describes the benchmark → train → compare loop.
 
-## How the pieces fit
+## From a failure to the next model
 
-```
-lkwb generate ──► dataset (parquet: audio + recipe per clip) ──► lkwb bench ──► results/<model>/
-      ▲                       │                                       │
-      │                       └──► WakeWordData / Augment ──► your training loop
-      │                                                               │
-      └──────────── generate more of what fails ◄── lkwb compare ◄────┘
-```
+1. **Run a baseline.** Benchmark your model on the public “Hey LiveKit” dataset or your own test set. Keep the run so you can compare against it later.
+2. **Find a condition worth investigating.** Read the breakdown and listen to failed clips. A large drop across hundreds of clips is more useful than a bad result from two.
+3. **Make training examples for it.** Increase competing speech, loud noise or another relevant effect in the training split. Keep test voices, rooms and recordings out of training.
+4. **Train and compare.** Run the candidate on the same test set and compare both the score and the conditions. Check whether the fix helped elsewhere or introduced regressions.
 
-1. **Generate** speech with LiveKit Inference TTS, steered with phonemes, then mix in real noise, rooms, other talkers and device effects. Every clip records how it was made.
-2. **Benchmark** any detector on a dataset: the public "Hey LiveKit" set or your own.
-3. **Read the breakdown** to find the conditions where recall drops or false alarms rise.
-4. **Generate training data** for those conditions, train, and **compare** the new model against the old one on the same test set.
+The benchmark and generator support this loop; you supply the model and training code.

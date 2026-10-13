@@ -1,13 +1,15 @@
 # Development
 
+Start by installing the development dependencies and running the checks below. If you're adding a detector or an audio source, the extension points near the end of this page show where it belongs.
+
 ```bash
 uv sync --all-extras --group dev
 uv run pytest
 uv run ruff check src scripts tests examples
-uv run ruff format src scripts tests examples
+uv run ruff format --check src scripts tests examples
 ```
 
-The tests run offline in a few seconds. They build a small synthetic dataset and check the loader, the benchmark metrics, the report, mixing at an exact SNR, codecs without delay, phoneme rendering against the providers' documented examples, and that a silent model scores 0.
+The tests use local fixtures and synthetic audio, so they can run offline. They build a small synthetic dataset and check the loader, the benchmark metrics, the report, mixing at an exact SNR, codecs without delay, phoneme rendering against the providers' documented examples, and that a silent model scores 0.
 
 ## Platform policy
 
@@ -49,7 +51,7 @@ docs/             this documentation
 | script | does |
 |---|---|
 | `scripts/qa_dataset.py DATASET [--asr-n 20] [--plots DIR]` | runs `verify`, transcribes a sample of clips with Whisper to confirm they say what their labels claim, and writes a spectrogram gallery |
-| `scripts/readme_figures.py RUN --dataset D --model M` | rebuilds every README chart from a saved run, including the "one clip, two rooms" example |
+| `scripts/readme_figures.py RUN --dataset D --model M` | rebuilds every README chart from a saved run, including the same-clip comparison with and without a competing voice |
 
 Both need the `dev` group; `readme_figures.py` also needs the `livekit` extra.
 

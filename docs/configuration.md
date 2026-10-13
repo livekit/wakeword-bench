@@ -1,6 +1,8 @@
 # Configuration
 
-Every generation setting is a knob with a dotted name, such as `augment.p_reverb` or `splits.test.n_positive`. There are three ways to set knobs, and they combine:
+To give your model more practice in reverberant rooms, increase `augment.p_reverb`. To make that experiment repeatable, save it in a config.
+
+Generation settings use dotted names. Set them on the command line for a quick experiment, in Python for a training pipeline, or in YAML to keep a recipe in version control:
 
 ```bash
 # 1. command line
@@ -24,9 +26,9 @@ augment:
 
 Precedence, from lowest to highest: built-in defaults, the YAML file, `--size`, `--plan`, then `--set` values.
 
-`uv run lkwb knobs` prints every knob with its default; `lkwb knobs -c my.yaml` shows the values a config resolves to, and `--json` gives machine-readable output. A typo fails loudly: `unknown knob 'augment.p_reverbb'`.
+`uv run lkwb knobs` prints every knob with its default; `lkwb knobs -c my.yaml` shows the values a config resolves to, and `--json` gives machine-readable output. Unknown keys are rejected: `unknown knob 'augment.p_reverbb'`.
 
-Values are parsed as YAML, so numbers, booleans, lists and maps all work on the command line: `--set augment.sir_db=[0,10]`, `--set 'augment.snr_weights={extreme: 3}'`.
+Values are parsed as YAML, so numbers, booleans, lists and maps all work on the command line: `--set 'augment.sir_db=[0,10]'`, `--set 'augment.snr_weights={extreme: 3}'`.
 
 ## Phrase and pronunciation
 
@@ -39,7 +41,7 @@ Values are parsed as YAML, so numbers, booleans, lists and maps all work on the 
 | `hard_negatives` | `[]` | extra near-miss phrases, added to the automatic ones |
 | `p_carrier` | 0.35 | share of wake words and near-misses placed inside a sentence |
 | `language` | `en` | TTS language |
-| `seed` | 1234 | random seed; the same config always produces the same dataset |
+| `seed` | 1234 | random seed for sampling and augmentation |
 
 ## Text-to-speech
 

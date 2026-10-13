@@ -1,6 +1,8 @@
 # CLI reference
 
-All commands run as `uv run lkwb <command>`. `lkwb <command> --help` shows the same information. Commands that generate audio read LiveKit credentials from `.env.local` (see [Generating datasets](generating-datasets.md)).
+Use this page to look up a command or flag. For a first run, follow [Benchmarking](benchmarking.md) or [Generating datasets](generating-datasets.md).
+
+Run commands as `uv run lkwb <command>` from the repo. Add `--help` for the available options. TTS generation reads LiveKit credentials from `.env.local`; benchmarking existing audio needs no LiveKit credentials.
 
 | command | does |
 |---|---|

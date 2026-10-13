@@ -1,13 +1,15 @@
 # Augmentation
 
-Clean TTS speech is not what a device hears. After synthesis, each clip passes through a chain of effects in the order sound actually travels: the room, then the scene around the speaker, then the device that records it, then the network that carries it.
+Suppose your model recognizes clean speech but struggles when a colleague talks nearby. You can add more competing speech to training without asking TTS to record every phrase again.
+
+Augmentation starts with synthesized speech and adds the room, surrounding sounds, microphone effects and transmission effects in this order:
 
 ```
 speech ─► room reverb ─► + another voice ─► + background noise (+ a second noise)
        ─► microphone EQ ─► band-limit ─► input gain ─► clipping ─► codec
 ```
 
-Each step fires with its own probability. Whatever fires is recorded on the clip, so every effect can be measured separately, and `augmentations` summarizes the combination (for example `reverb+talker+noise+codec`).
+Effects are sampled from the configured probabilities and ranges. Each generated clip records which effects were applied; `augmentations` summarizes the combination, such as `reverb+talker+noise+codec`. This lets you group benchmark results by condition.
 
 ## The steps
 
@@ -68,15 +70,19 @@ from livekit_wakeword_bench import DEFAULT_DATASET, WakeWordData, load_config
 from livekit_wakeword_bench.loader import Augment
 
 train = WakeWordData(DEFAULT_DATASET, split="train")
-train = train.with_transform(Augment())                                   # default settings
-train = train.with_transform(Augment(spec=load_config("my.yaml").augment))  # your settings
+train = train.with_transform(Augment())
+
+# To use settings from a config instead:
+custom = WakeWordData(DEFAULT_DATASET, split="train").with_transform(
+    Augment(spec=load_config("my.yaml").augment)
+)
 ```
 
 Each access draws new random effects, so the model sees a different version of every clip in every epoch. See [Loading data](loading-data.md).
 
 ## Targeting a weakness
 
-If a benchmark shows the model failing in a condition, raise that condition in training data:
+Once a breakdown shows a consistent weakness, make that condition more common in training. These settings are starting points; compare the next model on the unchanged test set to see whether they helped:
 
 | weakness | settings |
 |---|---|

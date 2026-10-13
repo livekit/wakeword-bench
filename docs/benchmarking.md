@@ -1,6 +1,8 @@
 # Benchmarking
 
-A benchmark run plays every clip in a dataset through your detector, records its score over time, and turns those scores into metrics: one headline `score` plus results for every condition (noise level, competing voice, accent, phrasing and so on).
+You've changed your model to handle background conversation. It catches the examples you tried, but does it also trigger more often on ordinary speech?
+
+Run the baseline and candidate on the same clips to find out. The benchmark records each detector's scores over time, measures missed wake words and false alarms, and breaks the results down by condition.
 
 Benchmarking existing data needs no LiveKit credentials. The default dataset is the public [`binhpham/wakeword-bench-hey-livekit`](https://huggingface.co/datasets/binhpham/wakeword-bench-hey-livekit) test split: 7,873 clips, 12.3 hours.
 
@@ -19,6 +21,8 @@ res = benchmark("livekit:path/to/model.onnx", limit=1000)
 print(res.summary()["score"])
 ```
 
+After a CLI run, open `results/report.html` to inspect the score and listen to failures. The headline `score` is recall at no more than 0.5 false alarms per hour; the condition breakdowns use the operating threshold, which defaults to 0.5. See [Metrics](metrics.md) before comparing those numbers.
+
 ## Plugging in your model
 
 A detector is any object with a `name` and a `detect(audio, sample_rate)` method. It receives the **whole clip** (float32 mono, values in −1…1) and returns a score timeline. How it consumes the audio (chunk size, ring buffers, VAD gating, streaming state) is entirely up to the detector.
@@ -31,7 +35,7 @@ class MyModel:
     name = "my-model"
 
     def __init__(self):
-        self.model = load_my_model()
+        self.model = load_my_model()  # replace with your model loader
 
     def detect(self, audio: np.ndarray, sample_rate: int) -> Prediction:
         times, scores = [], []
@@ -126,7 +130,7 @@ uv run lkwb compare results/baseline/my-model results/candidate/my-model
 uv run lkwb compare results/a/x results/b/y --json --top 20 --min-n 50
 ```
 
-`compare` lists the change in every headline metric, then every condition sorted from worst regression to best improvement. Conditions smaller than `--min-n` clips (default 20) are skipped because their numbers are too noisy.
+`compare` lists the change in every headline metric, then every condition sorted from worst regression to best improvement. Conditions with fewer than `--min-n` clips (default 20) are skipped. For the rest, inspect the confidence intervals as well as the deltas; a small change may still be inconclusive.
 
 In Python:
 
@@ -137,6 +141,8 @@ diff = compare(BenchResult.load("results/a/x"), BenchResult.load("results/b/y"))
 diff["headline"]["score"]      # {"base": ..., "new": ..., "delta": ...}
 diff["slices"][:5]             # worst regressions
 ```
+
+If competing speech remains a weak spot, use the [augmentation guide](augmentation.md#targeting-a-weakness) to generate training examples for it. Keep the evaluation dataset fixed while you iterate.
 
 ## Re-scoring without re-running
 

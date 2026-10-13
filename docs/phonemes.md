@@ -2,7 +2,7 @@
 
 Text-to-speech engines guess how to say words they don't know. For a brand name the guesses vary: one voice says "LiveKit" as /laɪv kɪt/ ("live" as in "live music"), another as /lɪv kɪt/ ("live" as in "I live here"), another as "life kid". A wake word benchmark built on those guesses would mix right and wrong pronunciations under the same label.
 
-So the generator sends the wake word, and every near-miss phrase, to TTS as **phonemes**. Every voice says exactly the sounds you specify. Carrier sentences and everyday speech stay plain text.
+The generator sends the wake word and near-miss phrases as **phonemes** so each provider receives an explicit pronunciation. This reduces guesswork, though you should still listen to generated samples. Carrier sentences and everyday speech stay plain text.
 
 ## Supported providers
 
@@ -19,7 +19,7 @@ Each provider was checked by synthesizing words from phonemes alone (no spelling
 
 ## Where pronunciations come from
 
-1. **The CMU pronouncing dictionary** covers about 130,000 English words. Words found there need nothing.
+1. **The CMU pronouncing dictionary** covers about 130,000 English words. Known words use the dictionary pronunciation unless you override it.
 2. **Compound words** that are not in the dictionary are split into known parts: "livekit" → "live" + "kit". Later parts get secondary stress.
 3. **Your `pronunciations` config** overrides both.
 
