@@ -122,17 +122,32 @@ def _text(
     )
 
 
+PAD = 32  # outer padding on every chart
+
+
 def _pct(v: float | None) -> str:
     return "–" if v is None else f"{100 * v:.0f}%"
 
 
-def _ci_bar(
-    x0: float, sx: Any, cy: float, v: float, lo: float, hi: float, col: str, c: dict
+def _frame(
+    title: str, c: dict, legend: list[tuple[str, str]] | None = None, w: int = 880
+) -> list[str]:
+    """Title (top-left) and an optional color legend (top-right)."""
+    out = [_text(PAD, PAD + 14, title, c["fg0"], 15, weight=600)]
+    x = w - PAD
+    for label, col in reversed(legend or []):
+        out.append(_text(x, PAD + 13, label, c["fg2"], 12, "end"))
+        x -= len(label) * 6.4 + 8
+        out.append(f'<rect x="{x - 10:.1f}" y="{PAD + 3}" width="10" height="10" fill="{col}"/>')
+        x -= 26
+    return out
+
+
+def _bar_row(
+    sx: Any, x0: float, cy: float, v: float, lo: float, hi: float, col: str, c: dict
 ) -> str:
-    out = f'<rect x="{x0}" y="{cy - 7:.1f}" width="{max(sx(v) - x0, 1):.1f}" height="14" fill="{col}"/>'
-    out += f'<line x1="{sx(lo):.1f}" y1="{cy:.1f}" x2="{sx(hi):.1f}" y2="{cy:.1f}" stroke="{c["fg0"]}" stroke-width="1.3"/>'
-    for e in (lo, hi):
-        out += f'<line x1="{sx(e):.1f}" y1="{cy - 4:.1f}" x2="{sx(e):.1f}" y2="{cy + 4:.1f}" stroke="{c["fg0"]}" stroke-width="1.3"/>'
+    out = f'<rect x="{x0}" y="{cy - 8:.1f}" width="{max(sx(v) - x0, 1):.1f}" height="16" fill="{col}"/>'
+    out += f'<line x1="{sx(lo):.1f}" y1="{cy:.1f}" x2="{sx(hi):.1f}" y2="{cy:.1f}" stroke="{c["fg1"]}" stroke-opacity="0.55" stroke-width="1"/>'
     return out
 
 
@@ -144,94 +159,102 @@ def _tone(lo: float, hi: float, ref: float, c: dict, good_high: bool = True) -> 
     return c["fg4"]
 
 
+def _vline_label(x: float, y0: float, y1: float, label: str, c: dict) -> list[str]:
+    return [
+        f'<line x1="{x:.1f}" y1="{y0}" x2="{x:.1f}" y2="{y1}" stroke="{c["fg1"]}" stroke-dasharray="4 4"/>',
+        _text(x, y0 - 8, label, c["fg1"], 11.5, "middle", mono=True),
+    ]
+
+
 # ---- teaser: one clip, with and without a second voice ----------------------------------------
-def traces(examples: list[dict[str, Any]], thr: float, theme: str = "dark", w: int = 520) -> str:
-    """examples: [{"label", "audio", "sr", "times", "scores"}]; waveform + score per row."""
+def traces(examples: list[dict[str, Any]], thr: float, theme: str = "dark", w: int = 560) -> str:
+    """examples: [{"label", "audio", "sr", "times", "scores"}]."""
     c = PALETTE[theme]
-    row_h, top, L, R = 120, 16, 16, 16
-    h = top + len(examples) * row_h + 26
-    out = []
+    out = _frame("One clip, two rooms", c, w=w)
+    top, row_h = PAD + 44, 132
+    h = top + len(examples) * row_h + PAD - 12
+    L, R = PAD, w - PAD - 96
     T = max(len(e["audio"]) / e["sr"] for e in examples)
-    sx = lambda t: L + t / T * (w - L - R)  # noqa: E731
+    sx = lambda t: L + t / T * (R - L)  # noqa: E731
     for i, ex in enumerate(examples):
         y0 = top + i * row_h
-        hit = bool(np.any(ex["scores"] >= thr))
+        best = float(np.max(ex["scores"]))
+        hit = best >= thr
         col = c["success"] if hit else c["chart8"]
-        out.append(_text(L, y0 + 12, ex["label"], c["fg1"], 13, weight=600))
-        out.append(
-            _text(w - R, y0 + 12, "detected" if hit else "missed", col, 12, "end", caps=True)
-        )
+        out.append(_text(L, y0 + 4, ex["label"], c["fg1"], 13))
         a = ex["audio"]
-        n = 240
-        seg = np.array_split(np.abs(a), n)
+        n = 200
         peak = max(float(np.abs(a).max()), 1e-6)
-        mid, amp = y0 + 52, 18
-        for j, s in enumerate(seg):
-            v = float(s.max()) / peak * amp if len(s) else 0
+        mid, amp = y0 + 34, 18
+        for j, seg in enumerate(np.array_split(np.abs(a), n)):
+            v = float(seg.max()) / peak * amp if len(seg) else 0
             x = sx(j / n * T)
             out.append(
-                f'<line x1="{x:.1f}" y1="{mid - v:.1f}" x2="{x:.1f}" y2="{mid + v:.1f}" stroke="{c["fg4"]}" stroke-width="1"/>'
+                f'<line x1="{x:.1f}" y1="{mid - v:.1f}" x2="{x:.1f}" y2="{mid + v:.1f}" stroke="{c["fg4"]}" stroke-width="1.2"/>'
             )
-        sy = lambda s, y0=y0: y0 + 106 - s * 36  # noqa: E731
+        base, top_s = y0 + 104, y0 + 64
+        sy = lambda v, b=base, t=top_s: b - v * (b - t)  # noqa: E731
         out.append(
-            f'<line x1="{L}" y1="{sy(thr):.1f}" x2="{w - R}" y2="{sy(thr):.1f}" stroke="{c["fg3"]}" stroke-dasharray="3 3"/>'
+            f'<line x1="{L}" y1="{sy(thr):.1f}" x2="{R}" y2="{sy(thr):.1f}" stroke="{c["fg3"]}" stroke-dasharray="4 4"/>'
         )
         pts = " ".join(
-            f"{sx(float(t)):.1f},{sy(float(s)):.1f}" for t, s in zip(ex["times"], ex["scores"])
+            f"{sx(float(t)):.1f},{sy(float(v)):.1f}" for t, v in zip(ex["times"], ex["scores"])
         )
         out.append(f'<polyline points="{pts}" fill="none" stroke="{col}" stroke-width="2"/>')
-        k = int(np.argmax(ex["scores"]))
-        out.append(
-            f'<circle cx="{sx(float(ex["times"][k])):.1f}" cy="{sy(float(ex["scores"][k])):.1f}" r="3.5" fill="{col}"/>'
-        )
-    out.append(
-        _text(w - R, h - 8, f"score  ···  threshold {thr:g}", c["fg3"], 11, "end", mono=True)
-    )
+        out.append(_text(R + 20, base - 22, f"{best:.2f}", col, 22, mono=True, weight=600))
+        out.append(_text(R + 20, base - 2, "caught" if hit else "missed", col, 12))
+        if i == 0:
+            out.append(_text(L - 4, sy(thr) - 6, "trigger level", c["fg3"], 11))
     return _svg(w, h, "".join(out), c)
 
 
-def recall_by_talker(res: BenchResult, theme: str = "dark", w: int = 340) -> str:
-    """Recall vs competing-talker loudness (SIR bins)."""
+def recall_by_talker(res: BenchResult, theme: str = "dark", w: int = 380) -> str:
+    """Recall vs how loud a second talker is."""
     c = PALETTE[theme]
     df = res.frame()
     ti = int(np.argmin(np.abs(THRESHOLDS - res.cfg.threshold)))
     pos = df[df.label == 1].copy()
     pos["hit"] = [d[ti] for d in pos.detected]
-    groups = [("none", pos[pos.interferer == ""])]
+    groups = [("nobody", pos[pos.interferer == ""])]
     tk = pos[pos.interferer != ""]
-    for lo, hi in ((15, 20), (10, 15), (5, 10), (0, 5)):
-        groups.append((f"{lo}–{hi}", tk[(tk.sir_db >= lo) & (tk.sir_db < hi)]))
-    L, R, T, B = 40, 12, 24, 44
-    h = 282
-    bw = (w - L - R) / len(groups)
+    for lo, hi, name in (
+        (15, 20, "very quiet"),
+        (10, 15, "quiet"),
+        (5, 10, "medium"),
+        (0, 5, "loud"),
+    ):
+        groups.append((name, tk[(tk.sir_db >= lo) & (tk.sir_db < hi)]))
+    out = _frame("Recall drops as another person talks louder", c, w=w)
+    out[0] = out[0].replace('font-size="15"', 'font-size="14"')
+    L, R, T, B = PAD + 34, w - PAD, PAD + 56, 84
+    h = 360
+    bw = (R - L) / len(groups)
     sy = lambda v: T + (1 - v) * (h - T - B)  # noqa: E731
-    out = []
     for v in (0, 0.5, 1):
         out.append(
-            f'<line x1="{L}" y1="{sy(v):.1f}" x2="{w - R}" y2="{sy(v):.1f}" stroke="{c["separator1"]}"/>'
+            f'<line x1="{L}" y1="{sy(v):.1f}" x2="{R}" y2="{sy(v):.1f}" stroke="{c["separator1"]}"/>'
         )
-        out.append(_text(L - 6, sy(v) + 4, f"{int(v * 100)}%", c["fg3"], 10.5, "end", mono=True))
+        out.append(_text(L - 8, sy(v) + 4, f"{int(v * 100)}%", c["fg3"], 11, "end", mono=True))
     for i, (name, g) in enumerate(groups):
         if not len(g):
             continue
         r = float(g.hit.mean())
         lo, hi = wilson(float(g.hit.sum()), len(g))
-        x = L + i * bw + bw * 0.18
+        x = L + i * bw + bw * 0.16
         col = c["accent"] if i == 0 else c["chart8"]
         out.append(
-            f'<rect x="{x:.1f}" y="{sy(r):.1f}" width="{bw * 0.64:.1f}" height="{sy(0) - sy(r):.1f}" fill="{col}"/>'
+            f'<rect x="{x:.1f}" y="{sy(r):.1f}" width="{bw * 0.68:.1f}" height="{sy(0) - sy(r):.1f}" fill="{col}"/>'
         )
-        cx = x + bw * 0.32
+        cx = x + bw * 0.34
         out.append(
-            f'<line x1="{cx:.1f}" y1="{sy(lo):.1f}" x2="{cx:.1f}" y2="{sy(hi):.1f}" stroke="{c["fg0"]}" stroke-width="1.3"/>'
+            f'<line x1="{cx:.1f}" y1="{sy(lo):.1f}" x2="{cx:.1f}" y2="{sy(hi):.1f}" stroke="{c["fg1"]}" stroke-opacity="0.55"/>'
         )
-        out.append(_text(cx, sy(hi) - 6, _pct(r), c["fg0"], 12, "middle", mono=True, weight=600))
-        out.append(_text(cx, h - B + 16, name, c["fg2"], 11, "middle", mono=True))
-    out.append(
-        _text(
-            (L + w - R) / 2, h - 8, "second voice: dB quieter than speaker", c["fg3"], 11, "middle"
-        )
-    )
+        out.append(_text(cx, sy(hi) - 8, _pct(r), c["fg0"], 13, "middle", mono=True, weight=600))
+        out.append(_text(cx, h - B + 20, name, c["fg2"], 11.5, "middle"))
+    ax = h - B + 50
+    out.append(f'<line x1="{L}" y1="{ax}" x2="{R - 8}" y2="{ax}" stroke="{c["fg3"]}"/>')
+    out.append(f'<path d="M{R - 8},{ax - 4} L{R},{ax} L{R - 8},{ax + 4}" fill="{c["fg3"]}"/>')
+    out.append(_text((L + R) / 2, ax + 18, "other voice gets louder", c["fg3"], 11.5, "middle"))
     return _svg(w, h, "".join(out), c)
 
 
@@ -253,57 +276,57 @@ def scorecard(res: BenchResult, theme: str = "dark", w: int = 880) -> str:
         ("compute", f"{s['compute']['real_time_factor']:.2f}× RT", c["fg0"]),
     ]
     cols, gap = 3, 1
-    tw = (w - (cols - 1) * gap) / cols
-    th = 84
+    tw = (w - 2 * PAD - (cols - 1) * gap) / cols
+    th = 92
     rows = math.ceil(len(tiles) / cols)
-    h = rows * th + (rows - 1) * gap
-    out = [f'<rect width="{w}" height="{h}" fill="{c["separator1"]}"/>']
+    h = 2 * PAD + rows * th + (rows - 1) * gap
+    out = [
+        f'<rect x="{PAD}" y="{PAD}" width="{w - 2 * PAD}" height="{h - 2 * PAD}" fill="{c["separator1"]}"/>'
+    ]
     for i, (label, value, col) in enumerate(tiles):
-        x = (i % cols) * (tw + gap)
-        y = (i // cols) * (th + gap)
-        out.append(f'<rect x="{x:.1f}" y="{y}" width="{tw:.1f}" height="{th}" fill="{c["bg1"]}"/>')
-        out.append(_text(x + 18, y + 26, label, c["fg3"], 10.5, caps=True))
-        out.append(_text(x + 18, y + 64, value, col, 28, mono=True, weight=500))
+        x = PAD + (i % cols) * (tw + gap)
+        y = PAD + (i // cols) * (th + gap)
+        out.append(f'<rect x="{x:.1f}" y="{y}" width="{tw:.1f}" height="{th}" fill="{c["bg2"]}"/>')
+        out.append(_text(x + 20, y + 30, label, c["fg3"], 10.5, caps=True))
+        out.append(_text(x + 20, y + 70, value, col, 28, mono=True, weight=500))
     return _svg(w, int(h), "".join(out), c)
 
 
 # ---- recall vs false alarms ------------------------------------------------------------------
-def tradeoff(results: list[BenchResult], theme: str = "dark", w: int = 880, h: int = 340) -> str:
+def tradeoff(results: list[BenchResult], theme: str = "dark", w: int = 880, h: int = 400) -> str:
+    """Recall vs false alarms per hour, with the default threshold and the target called out."""
     c = PALETTE[theme]
-    L, R, T, B = 56, 24, 24, 48
+    out = _frame("Fewer false alarms cost recall", c, w=w)
+    L, R, T, B = PAD + 44, w - PAD, PAD + 52, 70
     xmin, xmax = 0.1, 1000.0
 
     def lx(f: float) -> float:
         span = math.log10(xmax) - math.log10(xmin)
-        return L + (math.log10(min(max(f, xmin), xmax)) - math.log10(xmin)) / span * (w - L - R)
+        return L + (math.log10(min(max(f, xmin), xmax)) - math.log10(xmin)) / span * (R - L)
 
     def ly(r: float) -> float:
         return T + (1 - r) * (h - T - B)
 
-    out = []
-    for f in (0.1, 1, 10, 100, 1000):
+    tgt = results[0].cfg.score_fpph if results else 0.5
+    out.append(
+        f'<rect x="{L}" y="{T}" width="{lx(tgt) - L:.1f}" height="{h - T - B}" fill="{c["success"]}" fill-opacity="0.10"/>'
+    )
+    out.append(_text(L + 8, T + 18, "target zone", c["success"], 11.5))
+    for f, lab in ((0.1, "0.1"), (1, "1"), (10, "10"), (100, "100"), (1000, "1000")):
         out.append(
             f'<line x1="{lx(f):.1f}" y1="{T}" x2="{lx(f):.1f}" y2="{h - B}" stroke="{c["separator1"]}"/>'
         )
-        out.append(_text(lx(f), h - B + 18, f"{f:g}", c["fg3"], 11, "middle", mono=True))
+        out.append(_text(lx(f), h - B + 20, lab, c["fg3"], 11, "middle", mono=True))
     for r in (0, 0.5, 1):
         out.append(
-            f'<line x1="{L}" y1="{ly(r):.1f}" x2="{w - R}" y2="{ly(r):.1f}" stroke="{c["separator1"]}"/>'
+            f'<line x1="{L}" y1="{ly(r):.1f}" x2="{R}" y2="{ly(r):.1f}" stroke="{c["separator1"]}"/>'
         )
-        out.append(_text(L - 8, ly(r) + 4, f"{int(r * 100)}%", c["fg3"], 11, "end", mono=True))
-    out.append(_text((L + w - R) / 2, h - 10, "false alarms per hour", c["fg3"], 12, "middle"))
+        out.append(_text(L - 10, ly(r) + 4, f"{int(r * 100)}%", c["fg3"], 11, "end", mono=True))
+    out.append(_text((L + R) / 2, h - B + 46, "false alarms per hour", c["fg3"], 12, "middle"))
     ym = (T + h - B) / 2
     out.append(
-        f'<text transform="rotate(-90 16 {ym})" x="16" y="{ym}" fill="{c["fg3"]}" font-size="12" text-anchor="middle">recall</text>'
+        f'<text transform="rotate(-90 {PAD + 2} {ym})" x="{PAD + 2}" y="{ym}" fill="{c["fg3"]}" font-size="12" text-anchor="middle">wake words caught</text>'
     )
-    tgt = results[0].cfg.score_fpph if results else 0.5
-    out.append(
-        f'<rect x="{L}" y="{T}" width="{lx(tgt) - L:.1f}" height="{h - T - B}" fill="{c["accent"]}" fill-opacity="0.07"/>'
-    )
-    out.append(
-        f'<line x1="{lx(tgt):.1f}" y1="{T}" x2="{lx(tgt):.1f}" y2="{h - B}" stroke="{c["fg3"]}" stroke-dasharray="3 3"/>'
-    )
-    out.append(_text(lx(tgt) + 6, T + 16, f"≤ {tgt:g}/h", c["fg3"], 11, mono=True))
     for i, res in enumerate(results):
         col = c[SERIES[i % len(SERIES)]]
         s = res.summary()
@@ -320,36 +343,36 @@ def tradeoff(results: list[BenchResult], theme: str = "dark", w: int = 880, h: i
             f'<polyline points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in pts)}" fill="none" stroke="{col}" stroke-width="2"/>'
         )
         a = s["at_threshold"]
+        px, py = lx(a["fpph"]), ly(a["recall"])
         out.append(
-            f'<circle cx="{lx(a["fpph"]):.1f}" cy="{ly(a["recall"]):.1f}" r="4" fill="{c["bg1"]}" stroke="{col}" stroke-width="2"/>'
+            f'<circle cx="{px:.1f}" cy="{py:.1f}" r="5" fill="{c["bg1"]}" stroke="{c["fg0"]}" stroke-width="2"/>'
         )
         out.append(
             _text(
-                lx(a["fpph"]) + 8,
-                ly(a["recall"]) + 16,
-                f"{_pct(a['recall'])} at {a['fpph']:.0f}/h",
-                c["fg2"],
-                11.5,
-                mono=True,
+                px + 12,
+                py + 22,
+                f"default threshold: {_pct(a['recall'])} caught, {a['fpph']:.0f} false alarms/h",
+                c["fg1"],
+                12,
             )
         )
-        out.append(f'<circle cx="{lx(xmin):.1f}" cy="{ly(s["score"]):.1f}" r="5" fill="{col}"/>')
+        qx, qy = lx(xmin), ly(s["score"])
+        out.append(f'<circle cx="{qx:.1f}" cy="{qy:.1f}" r="6" fill="{c["success"]}"/>')
         out.append(
             _text(
-                lx(xmin) + 10,
-                ly(s["score"]) - 8,
-                f"{100 * s['score']:.1f}%",
-                col,
-                13,
-                mono=True,
+                qx + 14,
+                qy - 10,
+                f"at target: {100 * s['score']:.1f}% caught",
+                c["success"],
+                12.5,
                 weight=600,
             )
         )
         if len(results) > 1:
             out.append(
-                f'<rect x="{w - R - 180}" y="{h - B - 18 - i * 18}" width="10" height="10" fill="{col}"/>'
+                f'<rect x="{R - 200}" y="{h - B - 24 - i * 20}" width="10" height="10" fill="{col}"/>'
             )
-            out.append(_text(w - R - 164, h - B - 9 - i * 18, res.detector, c["fg2"], 11.5))
+            out.append(_text(R - 184, h - B - 15 - i * 20, res.detector, c["fg2"], 12))
     return _svg(w, h, "".join(out), c)
 
 
@@ -357,7 +380,7 @@ def tradeoff(results: list[BenchResult], theme: str = "dark", w: int = 880, h: i
 FAILURE_AXES = [
     (
         "interferer",
-        "Second voice",
+        "Another voice",
         {"": "none", "ami": "meeting", "earnings22": "phone call", "peoples_speech": "web audio"},
     ),
     (
@@ -372,18 +395,18 @@ FAILURE_AXES = [
     ("accent", "Accent", {"unknown": "unlabeled"}),
     (
         "noise_bucket",
-        "Noise",
+        "Background noise",
         {
             "clean": "none",
-            "quiet": "20–30 dB",
-            "moderate": "10–20 dB",
-            "noisy": "5–10 dB",
-            "very_noisy": "0–5 dB",
-            "extreme": "−5–0 dB",
+            "quiet": "quiet",
+            "moderate": "moderate",
+            "noisy": "noisy",
+            "very_noisy": "very noisy",
+            "extreme": "louder than speech",
         },
     ),
     ("noise_type", "Noise type", {"": "none"}),
-    ("reverb", "Room", {"False": "dry", "True": "reverberant"}),
+    ("reverb", "Room", {"False": "dry", "True": "echoey"}),
     ("provider", "Voice provider", {}),
     ("codec", "Codec", {"none": "none"}),
 ]
@@ -412,6 +435,10 @@ def _slices(
     return overall, groups
 
 
+def _legend(c: dict) -> list[tuple[str, str]]:
+    return [("worse", c["chart8"]), ("better", c["success"]), ("no clear difference", c["fg4"])]
+
+
 def failures(
     res: BenchResult,
     theme: str = "dark",
@@ -420,45 +447,31 @@ def failures(
     axes: list[str] | None = None,
     significant_only: bool = False,
 ) -> str:
-    """Recall per slice, 95% CI whiskers; colored only when the CI excludes the overall recall."""
+    """Recall per condition vs the average; color only when the 95% CI excludes the average."""
     c = PALETTE[theme]
     overall, groups = _slices(res, min_n, axes, significant_only)
-    L, R, T, row, ghead, gap = 190, 64, 16, 24, 28, 10
-    h = T + len(groups) * (ghead + gap) + sum(len(g[1]) for g in groups) * row + 26
-    x0, x1 = L, w - R
-    sx = lambda v: x0 + v * (x1 - x0)  # noqa: E731
-    out = []
+    out = _frame("Wake words caught, by condition", c, _legend(c), w)
+    L, R, row, ghead, gap = PAD + 170, w - PAD - 56, 26, 30, 12
+    T = PAD + 64
+    h = T + len(groups) * (ghead + gap) + sum(len(g[1]) for g in groups) * row + PAD
+    sx = lambda v: L + v * (R - L)  # noqa: E731
     for v in (0, 0.5, 1):
         out.append(
-            f'<line x1="{sx(v):.1f}" y1="{T}" x2="{sx(v):.1f}" y2="{h - 24}" stroke="{c["separator1"]}"/>'
+            f'<line x1="{sx(v):.1f}" y1="{T}" x2="{sx(v):.1f}" y2="{h - PAD}" stroke="{c["separator1"]}"/>'
         )
-        out.append(_text(sx(v), h - 8, f"{int(v * 100)}%", c["fg4"], 10.5, "middle", mono=True))
-    out.append(
-        f'<line x1="{sx(overall):.1f}" y1="{T}" x2="{sx(overall):.1f}" y2="{h - 24}" stroke="{c["fg2"]}" stroke-dasharray="3 3"/>'
-    )
-    out.append(
-        _text(sx(overall), h - 8, f"all {_pct(overall)}", c["fg2"], 10.5, "middle", mono=True)
-    )
+    out += _vline_label(sx(overall), T, h - PAD, f"average {_pct(overall)}", c)
     y = T
     for title, rows in groups:
-        out.append(_text(24, y + 16, title, c["fg2"], 11, caps=True))
+        out.append(_text(PAD, y + 20, title, c["fg2"], 11, caps=True))
         y += ghead
         for r in rows:
             lo, hi = r["ci95"]
             col = _tone(lo, hi, overall, c)
             cy = y + row / 2
-            out.append(_text(L - 12, cy + 4, r["label"], c["fg1"], 12.5, "end"))
-            out.append(_ci_bar(x0, sx, cy, r["recall"], lo, hi, col, c))
+            out.append(_text(L - 14, cy + 4, r["label"], c["fg1"], 12.5, "end"))
+            out.append(_bar_row(sx, L, cy, r["recall"], lo, hi, col, c))
             out.append(
-                _text(
-                    x1 + 12,
-                    cy + 4,
-                    _pct(r["recall"]),
-                    c["fg1"] if col == c["fg4"] else col,
-                    12.5,
-                    mono=True,
-                    weight=600,
-                )
+                _text(R + 14, cy + 5, _pct(r["recall"]), c["fg0"], 13, mono=True, weight=600)
             )
             y += row
         y += gap
@@ -470,15 +483,15 @@ def _which_word(phrase: str, wake: list[str]) -> str | None:
     w = phrase.split()
     if len(w) == len(wake):
         diff = [i for i in range(len(w)) if w[i] != wake[i]]
-        return f"“{wake[diff[0]]}” swapped" if len(diff) == 1 else None
+        return f"“{wake[diff[0]]}” replaced" if len(diff) == 1 else None
     it = iter(wake)
     if 0 < len(w) < len(wake) and all(x in it for x in w):
-        return "word dropped"
+        return "a word left out"
     return None
 
 
 def near_misses(res: BenchResult, theme: str = "dark", w: int = 880, top: int = 6) -> str:
-    """Share of near-miss phrases accepted: by swapped word, then the worst phrases."""
+    """How often near-miss phrases trigger the model."""
     from .text import _cmu, _split_unknown
 
     c = PALETTE[theme]
@@ -501,38 +514,33 @@ def near_misses(res: BenchResult, theme: str = "dark", w: int = 880, top: int = 
         for p, g in adv.groupby("phrase")
         if len(g) >= 15
     ]
-    phr.sort(key=lambda r: (-r[2][0], -r[1]))
-    phr = phr[:top]
-    overall = float(adv.fa.mean()) if len(adv) else 0.0
-    L, R, row, ghead, gap = 190, 64, 24, 28, 10
-    groups = [g for g in (("Which word changed", kinds), ("Worst phrases", phr)) if g[1]]
-    h = 16 + len(groups) * (ghead + gap) + sum(len(g[1]) for g in groups) * row + 26
-    x0, x1 = L, w - R
-    sx = lambda v: x0 + v * (x1 - x0)  # noqa: E731
-    out = []
+    phr.sort(key=lambda r: (-r[2][0], -r[1]))  # pick by CI lower bound (robust)...
+    phr = sorted(phr[:top], key=lambda r: -r[1])  # ...display by the value shown
+    out = _frame("Similar-sounding phrases that wake the model", c, w=w)
+    L, R, row, ghead, gap = PAD + 170, w - PAD - 56, 26, 30, 12
+    T = PAD + 40
+    groups = [g for g in (("By change", kinds), ("Worst phrases", phr)) if g[1]]
+    h = T + len(groups) * (ghead + gap) + sum(len(g[1]) for g in groups) * row + PAD
+    sx = lambda v: L + v * (R - L)  # noqa: E731
     for v in (0, 0.5, 1):
         out.append(
-            f'<line x1="{sx(v):.1f}" y1="16" x2="{sx(v):.1f}" y2="{h - 24}" stroke="{c["separator1"]}"/>'
+            f'<line x1="{sx(v):.1f}" y1="{T}" x2="{sx(v):.1f}" y2="{h - PAD}" stroke="{c["separator1"]}"/>'
         )
-        out.append(_text(sx(v), h - 8, f"{int(v * 100)}%", c["fg4"], 10.5, "middle", mono=True))
-    out.append(
-        f'<line x1="{sx(overall):.1f}" y1="16" x2="{sx(overall):.1f}" y2="{h - 24}" stroke="{c["fg2"]}" stroke-dasharray="3 3"/>'
-    )
-    out.append(
-        _text(sx(overall), h - 8, f"all {_pct(overall)}", c["fg2"], 10.5, "middle", mono=True)
-    )
-    y = 16
+        out.append(
+            _text(sx(v), h - PAD + 18, f"{int(v * 100)}%", c["fg4"], 10.5, "middle", mono=True)
+        )
+    y = T
     for title, items in groups:
-        out.append(_text(24, y + 16, title, c["fg2"], 11, caps=True))
+        out.append(_text(PAD, y + 20, title, c["fg2"], 11, caps=True))
         y += ghead
         for label, rate, (lo, hi) in items:
             cy = y + row / 2
-            out.append(_text(L - 12, cy + 4, label, c["fg1"], 12.5, "end"))
-            out.append(_ci_bar(x0, sx, cy, rate, lo, hi, c["chart8"], c))
-            out.append(_text(x1 + 12, cy + 4, _pct(rate), c["chart8"], 12.5, mono=True, weight=600))
+            out.append(_text(L - 14, cy + 4, label, c["fg1"], 12.5, "end"))
+            out.append(_bar_row(sx, L, cy, rate, lo, hi, c["chart8"], c))
+            out.append(_text(R + 14, cy + 5, _pct(rate), c["fg0"], 13, mono=True, weight=600))
             y += row
         y += gap
-    return _svg(w, int(h), "".join(out), c)
+    return _svg(w, int(h + 20), "".join(out), c)
 
 
 def alarm_sources(res: BenchResult, theme: str = "dark", w: int = 880) -> str:
@@ -543,8 +551,8 @@ def alarm_sources(res: BenchResult, theme: str = "dark", w: int = 880) -> str:
     neg = df[(df.label == 0) & (df.category != "adversarial")].copy()
     neg["ev"] = [e[ti] for e in neg.events]
     names = {
-        "speech": "synthetic speech",
-        "real_speech": "real conversation",
+        "speech": "people talking (synthetic)",
+        "real_speech": "people talking (real)",
         "noise": "background noise",
     }
     src = [
@@ -552,18 +560,19 @@ def alarm_sources(res: BenchResult, theme: str = "dark", w: int = 880) -> str:
         for k, g in neg.groupby("category")
     ]
     src.sort(key=lambda r: -r[1])
-    L, R, row = 190, 64, 30
-    h = 16 + len(src) * row + 10
+    out = _frame("False alarms per hour, by what the model hears", c, w=w)
+    L, R, row = PAD + 190, w - PAD - 80, 36
+    T = PAD + 40
+    h = T + len(src) * row + PAD - 8
     mx = max([v for _, v in src] + [1e-9])
-    out = []
     for i, (name, v) in enumerate(src):
-        cy = 16 + i * row + row / 2
-        bw = (w - L - R - 60) * v / mx
-        out.append(_text(L - 12, cy + 4, name, c["fg1"], 12.5, "end"))
+        cy = T + i * row + row / 2
+        bw = (R - L) * v / mx
+        out.append(_text(L - 14, cy + 4, name, c["fg1"], 12.5, "end"))
         out.append(
-            f'<rect x="{L}" y="{cy - 8:.1f}" width="{max(bw, 1):.1f}" height="16" fill="{c["chart3"]}"/>'
+            f'<rect x="{L}" y="{cy - 9:.1f}" width="{max(bw, 1):.1f}" height="18" fill="{c["chart3"]}"/>'
         )
-        out.append(_text(L + bw + 10, cy + 5, f"{v:.0f}/h", c["fg1"], 12.5, mono=True, weight=600))
+        out.append(_text(L + bw + 12, cy + 5, f"{v:.0f}", c["fg0"], 13, mono=True, weight=600))
     return _svg(w, int(h), "".join(out), c)
 
 
@@ -599,10 +608,8 @@ def write_figures(res: BenchResult, out_dir: str | Path, prefix: str = "") -> li
     readme_axes = ["text_form", "accent", "noise_bucket", "noise_type", "reverb"]
     for theme in ("dark", "light"):
         for name, svg in (
-            ("scorecard", scorecard(res, theme)),
             ("tradeoff", tradeoff([res], theme)),
             ("failures", failures(res, theme, axes=readme_axes, significant_only=True)),
-            ("talker", recall_by_talker(res, theme)),
             ("near_misses", near_misses(res, theme)),
             ("alarm_sources", alarm_sources(res, theme)),
         ):
