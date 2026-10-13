@@ -25,6 +25,8 @@ LiveKit WakeWord Bench makes that process repeatable across noise, speakers, roo
 
 Use the public “Hey LiveKit” dataset, generate one for your own phrase, or bring your own data and detector.
 
+**Docs:** [Benchmarking](docs/benchmarking.md) · [Metrics](docs/metrics.md) · [Generating datasets](docs/generating-datasets.md) · [Phoneme steering](docs/phonemes.md) · [Augmentation](docs/augmentation.md) · [Loading data](docs/loading-data.md) · [Configuration](docs/configuration.md) · [CLI](docs/cli.md) · [All docs](docs/README.md)
+
 ## Try it
 
 From a checkout of this repo, with Python 3.12+ and [uv](https://docs.astral.sh/uv/):
@@ -39,7 +41,7 @@ uv run lkwb bench -d livekit:path/to/model.onnx --limit 1000
 uv run lkwb bench -d livekit:path/to/model.onnx
 ```
 
-The default dataset has 7,873 clips (12.3 hours). Each run saves JSON summaries, per-clip outcomes and score traces under `results/<model>/`, plus `results/report.html` with playable failures. Benchmarking existing data doesn't need LiveKit credentials.
+The default dataset has 7,873 clips (12.3 hours). Each run saves JSON summaries, per-clip outcomes and score traces under `results/<model>/`, plus `results/report.html` with playable failures. Benchmarking existing data doesn't need LiveKit credentials. How the score and other numbers are computed: [Metrics](docs/metrics.md).
 
 **The score is recall at no more than 0.5 false alarms per hour.** Higher is better. Set a different target with `--score-fpph`. Quick runs use a fixed random subset; compare runs with the same dataset and limit. Use `--workers 1` for accurate compute timing.
 
@@ -125,7 +127,7 @@ uv run lkwb bench -d my_pkg.models:make_model --json
 uv run lkwb compare results/baseline results/candidate --json
 ```
 
-Built-in adapters support `livekit:<model.onnx>` and `openwakeword:<name>`. See [examples/](examples/) for custom detectors and [AGENTS.md](AGENTS.md) for the benchmark → train → compare workflow.
+Built-in adapters support `livekit:<model.onnx>` and `openwakeword:<name>`. See [examples/](examples/) for custom detectors and [AGENTS.md](AGENTS.md) for the benchmark → train → compare workflow. More in [Benchmarking](docs/benchmarking.md).
 
 ## Generate training data
 
@@ -155,6 +157,8 @@ Use `--size tiny` for a smoke test or `small` for a first dataset. For unusual n
 
 Run `lkwb knobs` for all settings. Pass them as `--set key=value`, Python keyword arguments such as `augment__p_reverb=0.8`, or YAML with `-c`.
 
+More: [Generating datasets](docs/generating-datasets.md) (credentials, plans, sizes, verify, publishing), [Phoneme steering](docs/phonemes.md), [Augmentation](docs/augmentation.md), [Configuration](docs/configuration.md).
+
 ## Load data for training
 
 ```python
@@ -167,7 +171,7 @@ x, y = train.take(512).arrays()
 torch_dataset = train.torch()  # requires: uv sync --extra torch
 ```
 
-`Augment()` adds fresh noise, reverb and other effects from training sources on each access. Never train on the test split or test sources. `lkwb export-livekit` writes the LiveKit training layout; `lkwb export-wav` writes WAV files and a CSV.
+`Augment()` adds fresh noise, reverb and other effects from training sources on each access. Never train on the test split or test sources. `lkwb export-livekit` writes the LiveKit training layout; `lkwb export-wav` writes WAV files and a CSV. More in [Loading data](docs/loading-data.md).
 
 <details>
 <summary>Audio sources and licensing</summary>
@@ -179,9 +183,25 @@ torch_dataset = train.torch()  # requires: uv sync --extra torch
 
 WHAM!, ESC-50, Treble10 and GTZAN have non-commercial or research-only restrictions. Use `sources:` in your config to restrict source selection.
 
-Clips contain 16 kHz audio plus metadata for their voice, phrase, timing and augmentation. See the [dataset schema](src/livekit_wakeword_bench/dataset.py).
+Clips contain 16 kHz audio plus metadata for their voice, phrase, timing and augmentation. See [Dataset format](docs/dataset-format.md) and [Audio sources](docs/audio-sources.md).
 
 </details>
+
+## Documentation
+
+| Guide | Covers |
+|---|---|
+| [Benchmarking](docs/benchmarking.md) | running benchmarks, plugging in a model, outputs, comparing runs, re-scoring |
+| [Metrics](docs/metrics.md) | the score, recall, false alarms, latency, compute, confidence intervals |
+| [Generating datasets](docs/generating-datasets.md) | LiveKit credentials, plans, sizes, what gets generated, verifying, publishing |
+| [Phoneme steering](docs/phonemes.md) | providers, pronunciations, ARPAbet |
+| [Augmentation](docs/augmentation.md) | rooms, other voices, noise levels, microphone and codec effects |
+| [Audio sources](docs/audio-sources.md) | where noise, rooms and real speech come from, licenses, adding sources |
+| [Dataset format](docs/dataset-format.md) | files and every column |
+| [Loading data](docs/loading-data.md) | `WakeWordData`, windows, augmenting on the fly, PyTorch, exports |
+| [Configuration](docs/configuration.md) | every knob and its default |
+| [CLI reference](docs/cli.md) | every command and option |
+| [Development](docs/development.md) | tests, layout, scripts, extending the library |
 
 ## Development
 
