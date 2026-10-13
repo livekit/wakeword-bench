@@ -36,6 +36,9 @@ LiveKit Inference limits how many TTS connections can run at once, per [plan](ht
 
 Set `tts.plan` in a config file, or override the connection count with `LKWB_TTS_CONCURRENCY`. Never set concurrency above your account limit. All splits share one connection budget, so they synthesize in parallel without going over the limit.
 
+> [!WARNING]
+> Production voice agents share this TTS connection capacity. By default, generation can use the full configured plan limit, leaving no connections for agents to generate speech. Set `--set tts.concurrency=N` below your limit and leave enough capacity for production traffic. For example, `--set tts.concurrency=2` uses at most two connections; choose a value that fits your workload.
+
 ## 3. Generate
 
 ```bash
