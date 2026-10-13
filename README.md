@@ -2,20 +2,26 @@
 
 **Find the sounds that fool your wake word.**
 
-Test your model, see where it fails, and generate training data for those conditions.
-
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Dataset](https://img.shields.io/badge/%F0%9F%A4%97-dataset-yellow)](https://huggingface.co/datasets/binhpham/wakeword-bench-hey-livekit)
+
+Imagine a developer testing a voice agent at their desk. They say “Hey LiveKit,” and it responds. They try a few more times, and it seems ready. Later, while a colleague is talking nearby, they call it again. This time, nothing happens. They repeat themselves, a little louder.
+
+It's a small failure, but a hard one to debug. Does the model need more examples of their voice? More background noise? A lower detection threshold? Before they can improve it, they need to know what made it stop listening.
+
+We can isolate one of those possibilities by playing the same recording with and without a competing speaker. In the example below, adding a voice quieter than the wake word is enough to turn a detection into a miss.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/teaser_dark.svg">
   <img alt="One clip is detected alone and missed with a second voice; recall falls from 83% to 30% as the second voice gets louder" src="assets/teaser_light.svg">
 </picture>
 
-*Same wake word, different room.* One clip scores 0.97 alone and 0.01 with a second speaker just 5 dB quieter. Across 3,000 test wake words, recall falls from 83% to 30% as the competing voice gets louder.
+The clip's score drops from 0.97 to 0.01 with a competing voice 5 dB quieter. Across 3,000 test wake words, recall falls from 83% to 30% as that voice gets louder.
 
-An overall score won't tell you what to fix. This benchmark breaks results down by noise, competing speakers, room, accent, phrasing and codec, with 95% confidence intervals. Each generated clip has a known recipe, so you can make more training examples of the conditions your model struggles with. Test voices, noise and rooms stay separate from training.
+That gives the developer something specific to work on: competing speech. It also gives them a way to check whether more training actually helps.
+
+LiveKit WakeWord Bench makes that process repeatable across noise, speakers, rooms, accents, phrasing and codecs. It reports results for each condition with 95% confidence intervals. Because each generated clip has a known recipe, you can generate training data for a weak spot and benchmark the next model against the same test set. Test voices, noise and rooms stay separate from training.
 
 Use the public “Hey LiveKit” dataset, generate one for your own phrase, or bring your own data and detector.
 
