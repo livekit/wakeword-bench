@@ -14,7 +14,7 @@ Sources (all test-only; none is used to train or augment anything in the bench):
 |---|---|---|
 | `audioset_eval` | AudioSet evaluation clips (YouTube: TV, ads, music, crowds, vehicles) | CC BY 4.0 |
 | `fma` | Free Music Archive tracks with vocals | per-track Creative Commons |
-| `emilia_<lang>` | Emilia in-the-wild podcasts / talk shows / interviews, with transcripts (last shards) | CC BY-NC 4.0 (gated, auto-approved) |
+| `voxpopuli_<lang>` | VoxPopuli test splits: European Parliament speeches (6 languages + accented English), with transcripts | CC0 |
 
 Clips are about 60 s (shorter source clips are concatenated, longer ones cut). Podcasts carry
 transcripts, so a clip that actually says the wake word is excluded at benchmark time; AudioSet
@@ -43,14 +43,14 @@ CLIP_S = 60.0
 DEFAULT_HOURS: dict[str, float] = {
     "audioset_eval": 10.0,
     "fma": 4.0,
-    "emilia_en": 5.0,
-    "emilia_zh": 1.0,
-    "emilia_de": 1.0,
-    "emilia_fr": 1.0,
-    "emilia_ja": 1.0,
-    "emilia_ko": 1.0,
+    "voxpopuli_en_accented": 4.0,
+    "voxpopuli_de": 1.5,
+    "voxpopuli_fr": 1.5,
+    "voxpopuli_es": 1.0,
+    "voxpopuli_it": 1.0,
+    "voxpopuli_pl": 1.0,
 }
-KIND = {"audioset_eval": "tv_youtube", "fma": "music"}  # emilia_*: podcast
+KIND = {"audioset_eval": "tv_youtube", "fma": "music"}  # voxpopuli_*: speeches
 
 
 def _hf(repo: str, path: str) -> str:
@@ -126,12 +126,25 @@ def _emilia(lang: str) -> Iterator[tuple[np.ndarray, str, str]]:
                     yield resample(got[0], got[1], SR), f"podcast/{lang}", text
 
 
+def _voxpopuli(lang: str) -> Iterator[tuple[np.ndarray, str, str]]:
+    repo = "facebook/voxpopuli"
+    import pyarrow.parquet as pq
+
+    for f in _files(repo, f"{lang}/test-"):
+        for row in pq.read_table(_hf(repo, f)).to_pylist():
+            got = _decode(row["audio"]["bytes"])
+            if got:
+                yield resample(got[0], got[1], SR), f"speech/{lang}", str(row.get("raw_text") or "")
+
+
 def _stream(source: str) -> Iterator[tuple[np.ndarray, str, str]]:
     if source == "audioset_eval":
         return _audioset()
     if source == "fma":
         return _fma()
-    if source.startswith("emilia_"):
+    if source.startswith("voxpopuli_"):
+        return _voxpopuli(source.removeprefix("voxpopuli_"))
+    if source.startswith("emilia_"):  # gated: needs approved access to amphion/Emilia-Dataset
         return _emilia(source.removeprefix("emilia_"))
     raise ValueError(f"unknown media source {source!r}")
 
@@ -186,7 +199,7 @@ def build_media(out: str | Path, hours: dict[str, float] | None = None) -> Path:
                     "text": text,
                     "text_form": "transcript" if text else "",
                     "provider": source,
-                    "noise_type": KIND.get(source, "podcast"),
+                    "noise_type": KIND.get(source, "speeches"),
                     "noise_category": cat,
                 },
             )

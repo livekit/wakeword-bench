@@ -30,9 +30,9 @@ Both use exact wake word timing. When the wake word sits inside a sentence ("Hey
 
 **Media false alarms per hour** (with `--media`, `summary()["media"]`) count triggers on ~24 h of
 long-form media an always-on device hears in a home: TV and YouTube audio, music with vocals and
-podcasts. They are reported at the operating threshold and at the threshold that defines the
-score, overall and per type (`tv_youtube`, `music`, `podcast`), and are not part of FPPH or the
-score, so scores stay comparable with and without them. Podcast clips whose transcript contains
+speeches. They are reported at the operating threshold and at the threshold that defines the
+score, overall and per type (`tv_youtube`, `music`, `speeches`), and are not part of FPPH or the
+score, so scores stay comparable with and without them. Speech clips whose transcript contains
 the wake word are left out; AudioSet and music have no transcripts.
 
 **Near-misses accepted** (`adversarial_false_accept_rate`) is the share of near-miss clips ("hey live kid", "hey lime kit") that trigger the model. These clips are deliberately hard and short, so they are reported separately and are not part of FPPH.
