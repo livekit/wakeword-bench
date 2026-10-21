@@ -85,12 +85,14 @@ class SlidingWindowDetector:
 
 
 class LiveKitStreamingDetector:
-    """livekit-wakeword v2 streaming model: `WakeWordModel.process` on consecutive 80 ms chunks,
+    """livekit-wakeword v2 streaming model: `WakeWordModel.stream` on consecutive 80 ms chunks,
     exactly like `WakeWordListener` (state reset at the start of each clip)."""
 
     def __init__(self, model: Any, key: str, name: str | None = None) -> None:
         self._model = model
         self._key = key
+        # `stream()`; livekit-wakeword releases before the rename call it `process()`
+        self._stream = getattr(model, "stream", None) or model.process
         self.name = name or f"livekit:{key}"
 
     def detect(self, audio: np.ndarray, sample_rate: int) -> Prediction:
@@ -99,7 +101,7 @@ class LiveKitStreamingDetector:
         n = 1280
         times, scores = [], []
         for i in range(0, len(x) - n + 1, n):
-            scores.append(float(self._model.process(x[i : i + n])[self._key]))
+            scores.append(float(self._stream(x[i : i + n])[self._key]))
             times.append((i + n) / 16000)
         return Prediction(np.array(times, np.float32), np.array(scores, np.float32))
 
@@ -108,7 +110,7 @@ def livekit_detector(
     model_path: str, name: str | None = None, **kw: Any
 ) -> SlidingWindowDetector | LiveKitStreamingDetector:
     """livekit-wakeword ONNX model via its public API, fed the same way `WakeWordListener` does:
-    v2 streaming models through `process()` (80 ms chunks), v1 classifiers through `predict()`
+    v2 streaming models through `stream()` (80 ms chunks), v1 classifiers through `predict()`
     (2 s window, 80 ms hop)."""
     from pathlib import Path
 
