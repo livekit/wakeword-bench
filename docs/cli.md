@@ -20,6 +20,7 @@ Run commands as `uv run lkwb <command>` from the repo. Add `--help` for the avai
 | [`export-wav`](#export-wav) | write WAV files and a metadata CSV |
 | [`voices`](#voices) | list or test the TTS voices |
 | [`sources`](#sources) | download the noise, room and speech sources |
+| [`media`](#media) | build the long-form media negatives (TV, music, podcasts) |
 
 ## bench
 
@@ -41,8 +42,20 @@ lkwb bench [SOURCE] -d DETECTOR [-d DETECTOR ...] [options]
 | `--debounce` | 2.0 | seconds between counted triggers |
 | `--workers` | 1 | parallel processes (compute timing is only accurate with 1) |
 | `--json` | | print machine-readable results only |
+| `--media DIR` | | also report false alarms per hour on a long-form media set (`lkwb media`) |
 
 See [Benchmarking](benchmarking.md).
+
+## media
+
+```
+lkwb media [-o out/media] [--hours 1.0]
+```
+
+Builds the long-form real-world negatives once: about 24 h of TV/YouTube audio (AudioSet
+evaluation clips), music with vocals (Free Music Archive) and podcasts in six languages
+(Emilia-YODAS), as ~60 s clips. `--hours` scales every source (0.1 for a quick 2.4 h set). The set
+is phrase-independent; pass it to any benchmark with `lkwb bench ... --media out/media`.
 
 ## compare
 

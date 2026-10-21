@@ -1,0 +1,190 @@
+"""Long-form real-world negatives: hours of TV/YouTube audio, music and podcasts.
+
+The test split's FPPH covers about an hour of read and meeting speech. Always-on devices mostly
+false-trigger on media playing nearby (TV, radio, music with vocals, talk shows), so this set
+measures false alarms per hour on ~24 h of it. It is phrase-independent: build it once, then pass
+it to `benchmark(..., media=DIR)` for any wake word.
+
+    lkwb media -o out/media                 # ~24 h (default mix below)
+    lkwb bench out/hey_jarvis -d livekit:hey_jarvis.onnx --media out/media
+
+Sources (all test-only; none is used to train or augment anything in the bench):
+
+| source | content | license |
+|---|---|---|
+| `audioset_eval` | AudioSet evaluation clips (YouTube: TV, ads, music, crowds, vehicles) | CC BY 4.0 |
+| `fma` | Free Music Archive tracks with vocals | per-track Creative Commons |
+| `emilia_yodas_<lang>` | Emilia-YODAS in-the-wild podcasts / talk shows, with transcripts | CC BY 4.0 |
+
+Clips are about 60 s (shorter source clips are concatenated, longer ones cut). Podcasts carry
+transcripts, so a clip that actually says the wake word is excluded at benchmark time; AudioSet
+and music have none, so a rare real mention there counts as a false alarm (check `failures()`).
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import logging
+import tarfile
+from collections.abc import Iterator
+from pathlib import Path
+
+import numpy as np
+import soundfile as sf
+
+from .mix import resample, to_mono
+
+logger = logging.getLogger(__name__)
+SR = 16000
+CLIP_S = 60.0
+
+# hours per source in the default build (~24 h)
+DEFAULT_HOURS: dict[str, float] = {
+    "audioset_eval": 10.0,
+    "fma": 4.0,
+    "emilia_yodas_en": 5.0,
+    "emilia_yodas_fr": 1.0,
+    "emilia_yodas_de": 1.0,
+    "emilia_yodas_ko": 1.0,
+    "emilia_yodas_ja": 1.0,
+    "emilia_yodas_zh": 1.0,
+}
+KIND = {"audioset_eval": "tv_youtube", "fma": "music"}  # emilia_yodas_*: podcast
+
+
+def _hf(repo: str, path: str) -> str:
+    from huggingface_hub import hf_hub_download
+
+    return hf_hub_download(repo, path, repo_type="dataset")
+
+
+def _files(repo: str, prefix: str) -> list[str]:
+    from huggingface_hub import HfApi
+
+    return sorted(
+        f for f in HfApi().list_repo_files(repo, repo_type="dataset") if f.startswith(prefix)
+    )
+
+
+def _decode(data: bytes) -> tuple[np.ndarray, int] | None:
+    try:
+        a, sr = sf.read(io.BytesIO(data), dtype="float32", always_2d=False)
+    except Exception:  # noqa: BLE001
+        try:  # mp3 inside tar files: fall back to librosa/audioread when libsndfile can't
+            import librosa
+
+            a, sr = librosa.load(io.BytesIO(data), sr=None, mono=True)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("skip undecodable clip: %s", e)
+            return None
+    return to_mono(np.asarray(a, dtype=np.float32)), int(sr)
+
+
+def _audioset() -> Iterator[tuple[np.ndarray, str, str]]:
+    repo = "agkphysics/AudioSet"
+    import pyarrow.parquet as pq
+
+    for f in _files(repo, "data/eval/"):
+        for row in pq.read_table(_hf(repo, f)).to_pylist():
+            got = _decode(row["audio"]["bytes"])
+            if got:
+                yield resample(got[0], got[1], SR), "/".join(row["human_labels"][:2]), ""
+
+
+def _fma() -> Iterator[tuple[np.ndarray, str, str]]:
+    repo = "benjamin-paine/free-music-archive-small"
+    import pyarrow.parquet as pq
+
+    for f in _files(repo, "data/"):
+        for row in pq.read_table(_hf(repo, f)).to_pylist():
+            if row.get("instrumental"):  # vocals are what false-trigger a wake word
+                continue
+            got = _decode(row["audio"]["bytes"])
+            if got:
+                tags = ",".join((row.get("tags") or [])[:3])
+                yield resample(got[0], got[1], SR), f"music/{tags or 'untagged'}", ""
+
+
+def _emilia(lang: str) -> Iterator[tuple[np.ndarray, str, str]]:
+    repo = "amphion/Emilia-Dataset"
+    # the last shards: furthest from anything a model might have seen as training speech
+    for f in reversed(_files(repo, f"Emilia-YODAS/{lang.upper()}/")):
+        with tarfile.open(_hf(repo, f)) as tf:
+            members = {m.name: m for m in tf.getmembers() if m.isfile()}
+            for name, m in sorted(members.items()):
+                if not name.endswith((".mp3", ".wav", ".flac")):
+                    continue
+                meta = members.get(name.rsplit(".", 1)[0] + ".json")
+                text = ""
+                if meta is not None:
+                    fh = tf.extractfile(meta)
+                    text = json.loads(fh.read()).get("text", "") if fh else ""
+                fh = tf.extractfile(m)
+                got = _decode(fh.read()) if fh else None
+                if got:
+                    yield resample(got[0], got[1], SR), f"podcast/{lang}", text
+
+
+def _stream(source: str) -> Iterator[tuple[np.ndarray, str, str]]:
+    if source == "audioset_eval":
+        return _audioset()
+    if source == "fma":
+        return _fma()
+    if source.startswith("emilia_yodas_"):
+        return _emilia(source.removeprefix("emilia_yodas_"))
+    raise ValueError(f"unknown media source {source!r}")
+
+
+def _clips(source: str, hours: float) -> Iterator[tuple[np.ndarray, str, str]]:
+    """~CLIP_S clips: short items concatenated, long ones cut, until `hours` is reached."""
+    need, n = hours * 3600 * SR, int(CLIP_S * SR)
+    buf: list[np.ndarray] = []
+    cats: list[str] = []
+    texts: list[str] = []
+    have = 0
+    for a, cat, text in _stream(source):
+        while len(a):
+            take = a[: n - have]
+            a = a[len(take) :]
+            buf.append(take)
+            cats.append(cat)
+            texts.append(text)
+            have += len(take)
+            if have >= n:
+                yield np.concatenate(buf), cats[0], " ".join(t for t in texts if t)
+                need -= have
+                if need <= 0:
+                    return
+                buf, cats, texts, have = [], [], [], 0
+
+
+def build_media(out: str | Path, hours: dict[str, float] | None = None) -> Path:
+    """Write the media negatives as a bench dataset (split "media", category "media")."""
+    from .dataset import ShardWriter
+
+    out = Path(out)
+    if any((out / "data").glob("media-*.parquet")):
+        logger.info("[media] %s exists, skip", out)
+        return out
+    w = ShardWriter(out, "media", SR, shard_size=200)
+    for source, h in (hours or DEFAULT_HOURS).items():
+        n = 0
+        for audio, cat, text in _clips(source, h):
+            w.add(
+                audio,
+                {
+                    "id": f"media-{source}-{n:05d}",
+                    "label": 0,
+                    "category": "media",
+                    "text": text,
+                    "text_form": "transcript" if text else "",
+                    "provider": source,
+                    "noise_type": KIND.get(source, "podcast"),
+                    "noise_category": cat,
+                },
+            )
+            n += 1
+        logger.info("[media] %s: %d clips (%.1f h)", source, n, n * CLIP_S / 3600)
+    w.flush()
+    return out

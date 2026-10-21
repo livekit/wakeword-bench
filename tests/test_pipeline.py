@@ -268,3 +268,32 @@ def test_silent_model_scores_zero(ds_dir: Path) -> None:
     data = WakeWordData(ds_dir, "test")
     s = evaluate(run_detector(Silent(), data, progress=False), data, "silent").summary()
     assert s["score"] == 0.0 and s["curve"]["recall"][0] == 0.0
+
+
+def test_media_negatives(ds_dir: Path, tmp_path: Path) -> None:
+    from livekit_wakeword_bench.bench import _says, add_media
+
+    media = tmp_path / "media"
+    w = ShardWriter(media, "media", SR, shard_size=10)
+    rng = np.random.default_rng(1)
+    for i, kind in enumerate(["music", "tv_youtube", "podcast"]):
+        x = 0.01 * rng.standard_normal(30 * SR).astype(np.float32)
+        if kind == "music":  # two tones 10 s apart: two false alarms in 30 s
+            x[5 * SR : int(5.6 * SR)] += tone(0.6)
+            x[15 * SR : int(15.6 * SR)] += tone(0.6)
+        w.add(
+            x,
+            {"id": f"m{i}", "label": 0, "category": "media", "noise_type": kind, "provider": kind},
+        )
+    w.flush()
+    data = WakeWordData(ds_dir, "test")
+    res = evaluate(run_detector(tone_detector(), data, progress=False), data, "tone")
+    score_before = res.summary()["score"]
+    add_media(res, tone_detector(), data, media, progress=False)
+    s = res.summary()
+    m = s["media"]
+    assert m["hours"] == pytest.approx(90 / 3600, abs=1e-3)
+    assert m["by_type"]["music"]["at_threshold"] == pytest.approx(2 / (30 / 3600))
+    assert m["by_type"]["podcast"]["at_threshold"] == 0.0
+    assert s["score"] == score_before and s["at_threshold"]["fpph"] == 0.0  # not part of FPPH
+    assert _says("Okay, Hey Jarvis!", ["hey jarvis"]) and not _says("hey jarvisson", ["hey jarvis"])

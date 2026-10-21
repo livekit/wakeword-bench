@@ -15,7 +15,7 @@ FORMAT_VERSION = "1"
 
 DEFAULT_DATASET = "binhpham/wakeword-bench-hey-livekit"
 
-CATEGORIES = ("positive", "adversarial", "speech", "real_speech", "noise")
+CATEGORIES = ("positive", "adversarial", "speech", "real_speech", "noise", "media")
 
 # column -> default ("" / NaN / -1 when not applicable)
 SCHEMA: dict[str, Any] = {

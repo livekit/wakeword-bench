@@ -208,6 +208,9 @@ class BenchResult:
         aud = df.duration_s.to_numpy(dtype=np.float64)
         ok = np.flatnonzero(fpph <= self.cfg.score_fpph)
         score = float(recall[ok[0]]) if len(ok) else 0.0
+        media = self._media(
+            neg[neg.category == "media"], stack, ti, int(ok[0]) if len(ok) else None
+        )
         return {
             "detector": self.detector,
             "score": round(score, 4),
@@ -217,6 +220,7 @@ class BenchResult:
             "n_adversarial": int(len(adv)),
             "fpph_hours": round(neg_hours, 3),
             "at_threshold": op(ti),
+            "media": media,
             "at_target_fpph": targets,
             "compute": {
                 "real_time_factor": round(float(comp.sum() / max(aud.sum(), 1e-9)), 5),
@@ -233,6 +237,32 @@ class BenchResult:
                 "adversarial_false_accept_rate": _clean(adv_far),
             },
         }
+
+    @staticmethod
+    def _media(med: Any, stack: Any, ti: int, score_idx: int | None) -> dict[str, Any] | None:
+        """False alarms per hour on the long-form media negatives (`benchmark(media=...)`), at the
+        operating threshold and at the threshold that defines `score`; not part of `score`."""
+        if not len(med):
+            return None
+
+        def fa(g: Any) -> np.ndarray:
+            return stack(g.events).sum(0) / (float(g.duration_s.sum()) / 3600)
+
+        def at(curve: np.ndarray) -> dict[str, float | None]:
+            return {
+                "at_threshold": round(float(curve[ti]), 3),
+                "at_score_threshold": None
+                if score_idx is None
+                else round(float(curve[score_idx]), 3),
+            }
+
+        out: dict[str, Any] = {"hours": round(float(med.duration_s.sum()) / 3600, 3), **at(fa(med))}
+        out["by_type"] = {
+            str(k): {"hours": round(float(g.duration_s.sum()) / 3600, 3), **at(fa(g))}
+            for k, g in med.groupby("noise_type")
+        }
+        out["curve"] = _clean(fa(med))
+        return out
 
     def breakdown(self, threshold: float | None = None) -> dict[str, list[dict[str, Any]]]:
         """Per-axis slices at a threshold: recall for positives, FA rate / FPPH for negatives."""
@@ -504,12 +534,16 @@ def benchmark(
     cfg: BenchConfigRun | None = None,
     workers: int = 1,
     limit: int | None = None,
+    media: str | Path | None = None,
     **filters: Any,
 ) -> BenchResult:
     """Benchmark a detector (object or spec string) on a dataset dir / HF repo id.
 
     res = benchmark("livekit:model.onnx", limit=500)   # quick run on the public set
     res.summary()["score"]; res.breakdown(); res.failures(); res.save("results/x")
+
+    `media`: a long-form negatives set (`lkwb media`): also report false alarms per hour on it
+    (`summary()["media"]`). Clips whose transcript says the wake word are left out.
     """
     data = WakeWordData(source, split=split)
     if filters:
@@ -521,4 +555,33 @@ def benchmark(
         detector = load_detector(detector)
         det_name = detector.name
     res = run_detector(detector, data, source=str(source), workers=workers)
-    return evaluate(res, data, det_name, cfg)
+    out = evaluate(res, data, det_name, cfg)
+    if media is not None:
+        add_media(out, detector, data, media, workers=workers)
+    return out
+
+
+def add_media(
+    res: BenchResult,
+    detector: str | Detector,
+    data: WakeWordData,
+    media: str | Path,
+    workers: int = 1,
+    progress: bool = True,
+) -> BenchResult:
+    """Run `detector` on a media negatives set and add its clips to `res` (see `benchmark`)."""
+    words = sorted({str(w) for w in data.metadata().wake_word if w})
+    md = WakeWordData(str(media), split="media").filter(lambda m: not _says(m["text"], words))
+    raw = run_detector(detector, md, source=str(media), workers=workers, progress=progress)
+    extra = evaluate(raw, md, res.detector, res.cfg)
+    res.rows.extend(extra.rows)
+    res.traces.update(extra.traces)
+    return res
+
+
+def _says(text: str, words: list[str]) -> bool:
+    """Does a transcript contain one of the wake words (case/punctuation-insensitive)?"""
+    import re
+
+    norm = " " + " ".join(re.findall(r"\w+", str(text).lower())) + " "
+    return any(" " + " ".join(re.findall(r"\w+", w.lower())) + " " in norm for w in words)
