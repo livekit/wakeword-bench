@@ -14,7 +14,7 @@ Sources (all test-only; none is used to train or augment anything in the bench):
 |---|---|---|
 | `audioset_eval` | AudioSet evaluation clips (YouTube: TV, ads, music, crowds, vehicles) | CC BY 4.0 |
 | `fma` | Free Music Archive tracks with vocals | per-track Creative Commons |
-| `emilia_yodas_<lang>` | Emilia-YODAS in-the-wild podcasts / talk shows, with transcripts | CC BY 4.0 |
+| `emilia_<lang>` | Emilia in-the-wild podcasts / talk shows / interviews, with transcripts (last shards) | CC BY-NC 4.0 (gated, auto-approved) |
 
 Clips are about 60 s (shorter source clips are concatenated, longer ones cut). Podcasts carry
 transcripts, so a clip that actually says the wake word is excluded at benchmark time; AudioSet
@@ -43,14 +43,14 @@ CLIP_S = 60.0
 DEFAULT_HOURS: dict[str, float] = {
     "audioset_eval": 10.0,
     "fma": 4.0,
-    "emilia_yodas_en": 5.0,
-    "emilia_yodas_fr": 1.0,
-    "emilia_yodas_de": 1.0,
-    "emilia_yodas_ko": 1.0,
-    "emilia_yodas_ja": 1.0,
-    "emilia_yodas_zh": 1.0,
+    "emilia_en": 5.0,
+    "emilia_zh": 1.0,
+    "emilia_de": 1.0,
+    "emilia_fr": 1.0,
+    "emilia_ja": 1.0,
+    "emilia_ko": 1.0,
 }
-KIND = {"audioset_eval": "tv_youtube", "fma": "music"}  # emilia_yodas_*: podcast
+KIND = {"audioset_eval": "tv_youtube", "fma": "music"}  # emilia_*: podcast
 
 
 def _hf(repo: str, path: str) -> str:
@@ -109,7 +109,7 @@ def _fma() -> Iterator[tuple[np.ndarray, str, str]]:
 def _emilia(lang: str) -> Iterator[tuple[np.ndarray, str, str]]:
     repo = "amphion/Emilia-Dataset"
     # the last shards: furthest from anything a model might have seen as training speech
-    for f in reversed(_files(repo, f"Emilia-YODAS/{lang.upper()}/")):
+    for f in reversed(_files(repo, f"Emilia/{lang.upper()}/")):
         with tarfile.open(_hf(repo, f)) as tf:
             members = {m.name: m for m in tf.getmembers() if m.isfile()}
             for name, m in sorted(members.items()):
@@ -131,8 +131,8 @@ def _stream(source: str) -> Iterator[tuple[np.ndarray, str, str]]:
         return _audioset()
     if source == "fma":
         return _fma()
-    if source.startswith("emilia_yodas_"):
-        return _emilia(source.removeprefix("emilia_yodas_"))
+    if source.startswith("emilia_"):
+        return _emilia(source.removeprefix("emilia_"))
     raise ValueError(f"unknown media source {source!r}")
 
 
@@ -160,15 +160,21 @@ def _clips(source: str, hours: float) -> Iterator[tuple[np.ndarray, str, str]]:
 
 
 def build_media(out: str | Path, hours: dict[str, float] | None = None) -> Path:
-    """Write the media negatives as a bench dataset (split "media", category "media")."""
+    """Write the media negatives as a bench dataset (split "media", category "media").
+    Resumable: sources already written are skipped."""
+    import pyarrow.parquet as pq
+
     from .dataset import ShardWriter
 
     out = Path(out)
-    if any((out / "data").glob("media-*.parquet")):
-        logger.info("[media] %s exists, skip", out)
-        return out
+    shards = sorted((out / "data").glob("media-*.parquet"))
+    done = {p for f in shards for p in pq.read_table(f, columns=["provider"]).column(0).to_pylist()}
     w = ShardWriter(out, "media", SR, shard_size=200)
+    w._shard = len(shards)  # append after the existing shards
     for source, h in (hours or DEFAULT_HOURS).items():
+        if source in done:
+            logger.info("[media] %s exists, skip", source)
+            continue
         n = 0
         for audio, cat, text in _clips(source, h):
             w.add(
@@ -185,6 +191,6 @@ def build_media(out: str | Path, hours: dict[str, float] | None = None) -> Path:
                 },
             )
             n += 1
+        w.flush()  # a source is complete on disk before the next starts
         logger.info("[media] %s: %d clips (%.1f h)", source, n, n * CLIP_S / 3600)
-    w.flush()
     return out
