@@ -297,3 +297,116 @@ def test_media_negatives(ds_dir: Path, tmp_path: Path) -> None:
     assert m["by_type"]["podcast"]["at_threshold"] == 0.0
     assert s["score"] == score_before and s["at_threshold"]["fpph"] == 0.0  # not part of FPPH
     assert _says("Okay, Hey Jarvis!", ["hey jarvis"]) and not _says("hey jarvisson", ["hey jarvis"])
+
+
+def test_party_scene() -> None:
+    """A party scene adds 2-4 competing talkers, each at its own SIR, plus crowd babble at the
+    requested SNR, and labels the clip as noise bucket "party"."""
+    from livekit_wakeword_bench.augment import Augmenter
+    from livekit_wakeword_bench.config import AugmentSpec
+    from livekit_wakeword_bench.mix import active_rms
+
+    rng0 = np.random.default_rng(5)
+
+    class It:
+        def __init__(self, source: str, category: str) -> None:
+            self.source, self.category, self.name = source, category, "f.flac"
+
+    class Speech:
+        def __bool__(self) -> bool:
+            return True
+
+        def sample_segment(self, rng, sr, seconds):  # noqa: ANN001
+            return It("ami", "speech/meeting"), rng0.standard_normal(int(seconds * sr)), ""
+
+    class Noise:
+        def __bool__(self) -> bool:
+            return True
+
+        def sample_type(self, rng, coarse, sr=SR):  # noqa: ANN001
+            assert coarse == "babble"
+            return It("wham", "babble/restaurant_bar"), rng0.standard_normal(SR * 6)
+
+        def sample(self, rng, sr=SR):  # noqa: ANN001
+            return It("demand", "street/traffic"), rng0.standard_normal(SR * 6)
+
+    class Pools:
+        def noise(self, pool):  # noqa: ANN001
+            return Noise()
+
+        def rir(self, pool):  # noqa: ANN001
+            return None
+
+        def speech(self, pool):  # noqa: ANN001
+            return Speech()
+
+    spec = AugmentSpec(p_party=1.0, party_babble_snr_db=(4.0, 4.0), party_sir_db=(6.0, 6.0))
+    aug = Augmenter(spec, Pools(), "test")
+    speech = tone(1.0)
+    canvas = np.concatenate([np.zeros(SR, np.float32), speech, np.zeros(SR, np.float32)])
+    for seed in range(8):
+        meta: dict = {}
+        out = aug.scene(canvas, speech, np.random.default_rng(seed), meta)
+        assert meta["party"] and meta["noise_bucket"] == "party" and 2 <= meta["n_talkers"] <= 4
+        assert meta["noise_type"] == "babble" and meta["snr_db"] == 4.0 and meta["sir_db"] == 6.0
+        # talkers + babble: total interference power = n * (talker at 6 dB) + babble at 4 dB
+        ref = active_rms(speech, SR)
+        want = meta["n_talkers"] * (ref / 10**0.3) ** 2 + (ref / 10**0.2) ** 2
+        assert np.mean((out - canvas) ** 2) == pytest.approx(
+            want, rel=0.03
+        )  # independent: powers add
+        assert aug.describe(meta).startswith("party")
+    # noise-only clips and clips that may not carry a talker never become parties
+    meta = {}
+    aug.scene(canvas, speech, np.random.default_rng(0), meta, allow_talker=False)
+    assert not meta.get("party")
+
+
+def test_party_summary(tmp_path: Path) -> None:
+    """summary()["party"]: recall and false accepts on party clips (also part of the score)."""
+    root = tmp_path / "ds"
+    w = ShardWriter(root, "test", SR, shard_size=20)
+    rng = np.random.default_rng(0)
+    for i in range(8):
+        x = 0.01 * rng.standard_normal(int(3.5 * SR)).astype(np.float32)
+        party = i >= 4
+        if i not in (6, 7):  # two party wake words are missed: recall 0.5 in the party
+            x[2 * SR : int(2.6 * SR)] += tone(0.6)
+        w.add(
+            x,
+            {
+                "id": f"p{i}",
+                "label": 1,
+                "category": "positive",
+                "phrase_onset_s": 2.0,
+                "phrase_offset_s": 2.6,
+                "onset_s": 2.0,
+                "offset_s": 2.6,
+                "party": party,
+                "n_talkers": 3 if party else 0,
+                "noise_bucket": "party" if party else "quiet",
+            },
+        )
+    for i in range(4):
+        x = 0.01 * rng.standard_normal(int(10 * SR)).astype(np.float32)
+        if i == 0:  # one party negative triggers
+            x[SR : int(1.6 * SR)] += tone(0.6)
+        w.add(
+            x,
+            {
+                "id": f"s{i}",
+                "label": 0,
+                "category": "speech",
+                "party": i < 2,
+                "noise_bucket": "party" if i < 2 else "quiet",
+            },
+        )
+    w.flush()
+    data = WakeWordData(root, "test")
+    s = evaluate(run_detector(tone_detector(), data, progress=False), data, "tone").summary()
+    pt = s["party"]
+    assert pt["n_positive"] == 4 and pt["n_negative"] == 2
+    assert pt["recall"]["at_threshold"] == 0.5
+    assert pt["false_accept_rate"]["at_threshold"] == 0.5
+    assert pt["recall_by_talkers"] == {"3": 0.5}
+    assert s["at_threshold"]["recall"] == 0.75  # party clips count in the headline too

@@ -39,6 +39,11 @@ class AugmentSpec(BaseModel):
     p_reverb: float = 0.5
     p_interferer: float = 0.2
     sir_db: tuple[float, float] = (0.0, 20.0)
+    # party: several overlapping talkers close by plus crowd babble (replaces the talker + noise draw)
+    p_party: float = 0.1
+    party_talkers: tuple[int, int] = (2, 4)
+    party_sir_db: tuple[float, float] = (0.0, 10.0)  # each talker vs the target speech
+    party_babble_snr_db: tuple[float, float] = (0.0, 10.0)
     p_second_noise: float = 0.2
     p_eq: float = 0.4
     p_bandlimit: float = 0.15

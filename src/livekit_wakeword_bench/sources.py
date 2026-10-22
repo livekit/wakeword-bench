@@ -514,6 +514,18 @@ class AudioPool:
         it = self.pick(rng)
         return it, self.load(it)
 
+    def sample_type(
+        self, rng: np.random.Generator, coarse: str, sr: int = SR
+    ) -> tuple[Item, np.ndarray] | None:
+        """Like `sample`, restricted to one coarse type (e.g. "babble"); None if the pool has none."""
+        sub = self.tree.get(coarse)
+        if not sub:
+            return None
+        srcs = sub[sorted(sub)[int(rng.integers(len(sub)))]]
+        group = srcs[sorted(srcs)[int(rng.integers(len(srcs)))]]
+        it = group[int(rng.integers(len(group)))]
+        return it, self.load(it)
+
     def sample_segment(
         self, rng: np.random.Generator, sr: int, seconds: float
     ) -> tuple[Item, np.ndarray, str]:

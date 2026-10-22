@@ -35,6 +35,12 @@ score, overall and per type (`tv_youtube`, `music`, `speeches`), and are not par
 score, so scores stay comparable with and without them. Speech clips whose transcript contains
 the wake word are left out; AudioSet and music have no transcripts.
 
+**Party** (`summary()["party"]`, datasets generated with `augment.p_party`) reports recall on wake
+words said among 2–4 overlapping talkers plus crowd babble, and the share of party negatives that
+trigger, at the operating threshold and at the threshold that defines the score, with recall by
+number of talkers. Unlike media, party clips are part of the test split, so they also count in the
+score and FPPH. The `noise_bucket=party` slice shows the same clips in every breakdown.
+
 **Near-misses accepted** (`adversarial_false_accept_rate`) is the share of near-miss clips ("hey live kid", "hey lime kit") that trigger the model. These clips are deliberately hard and short, so they are reported separately and are not part of FPPH.
 
 ## Cost
