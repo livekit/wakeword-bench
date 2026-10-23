@@ -16,7 +16,7 @@ Effects are sampled from the configured probabilities and ranges. A party scene 
 | step | what it simulates | setting (default) | recorded as |
 |---|---|---|---|
 | room reverb | the room the speaker is in | `augment.p_reverb` (0.5) | `reverb`, `rir_source`, `rir_category` |
-| party | a kitchen, a party, an open office: 2–4 people talking over the speaker, plus crowd babble | `augment.p_party` (0.1), `party_talkers` (2–4), `party_sir_db` (0–10 dB), `party_babble_snr_db` (0–10 dB) | `party`, `n_talkers`, `noise_bucket=party` |
+| party | a kitchen, a party, an open office: 2–4 people talking over the speaker, plus crowd babble | `augment.p_party` (0.1), `party_talkers` (2–4), `party_sir_db` (5–15 dB), `party_babble_snr_db` (0–10 dB) | `party`, `n_talkers`, `noise_bucket=party` |
 | another voice | a TV, a colleague, a meeting in the background | `augment.p_interferer` (0.2), `augment.sir_db` (0–20 dB) | `interferer`, `sir_db` |
 | background noise | traffic, a café, an appliance, music | `augment.snr_buckets`, `snr_weights`, `clean_weight` | `noise_bucket`, `snr_db`, `noise_type`, `noise_category` |
 | second noise | two noises at once (traffic and music) | `augment.p_second_noise` (0.2) | `noise2_category` |

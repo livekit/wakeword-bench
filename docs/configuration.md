@@ -73,7 +73,7 @@ See [Augmentation](augmentation.md) for what each step does.
 | `augment.sir_db` | `[0, 20]` | how much quieter the other voice is, in dB |
 | `augment.p_party` | 0.1 | party scene: several talkers over the speaker plus crowd babble |
 | `augment.party_talkers` | `[2, 4]` | number of competing talkers in a party |
-| `augment.party_sir_db` | `[0, 10]` | how much quieter each party talker is, in dB |
+| `augment.party_sir_db` | `[5, 15]` | how much quieter each party talker is, in dB |
 | `augment.party_babble_snr_db` | `[0, 10]` | crowd babble level below the speaker, in dB |
 | `augment.p_second_noise` | 0.2 | a second, layered noise |
 | `augment.p_eq` | 0.4 | microphone EQ |
