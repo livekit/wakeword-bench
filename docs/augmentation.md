@@ -9,13 +9,14 @@ speech ─► room reverb ─► + another voice ─► + background noise (+ a 
        ─► microphone EQ ─► band-limit ─► input gain ─► clipping ─► codec
 ```
 
-Effects are sampled from the configured probabilities and ranges. Each generated clip records which effects were applied; `augmentations` summarizes the combination, such as `reverb+talker+noise+codec`. This lets you group benchmark results by condition.
+Effects are sampled from the configured probabilities and ranges. A party scene replaces the "another voice" and background noise steps for that clip: its talkers come from the same held-out speech as the other voice, and its babble from the crowd recordings in the noise pool (WHAM!, DEMAND cafeteria and restaurant). Each generated clip records which effects were applied; `augmentations` summarizes the combination, such as `reverb+talker+noise+codec`. This lets you group benchmark results by condition.
 
 ## The steps
 
 | step | what it simulates | setting (default) | recorded as |
 |---|---|---|---|
 | room reverb | the room the speaker is in | `augment.p_reverb` (0.5) | `reverb`, `rir_source`, `rir_category` |
+| party | a kitchen, a party, an open office: 2–4 people talking over the speaker, plus crowd babble | `augment.p_party` (0.1), `party_talkers` (2–4), `party_sir_db` (5–15 dB), `party_babble_snr_db` (0–10 dB) | `party`, `n_talkers`, `noise_bucket=party` |
 | another voice | a TV, a colleague, a meeting in the background | `augment.p_interferer` (0.2), `augment.sir_db` (0–20 dB) | `interferer`, `sir_db` |
 | background noise | traffic, a café, an appliance, music | `augment.snr_buckets`, `snr_weights`, `clean_weight` | `noise_bucket`, `snr_db`, `noise_type`, `noise_category` |
 | second noise | two noises at once (traffic and music) | `augment.p_second_noise` (0.2) | `noise2_category` |
@@ -87,6 +88,7 @@ Once a breakdown shows a consistent weakness, make that condition more common in
 | weakness | settings |
 |---|---|
 | another voice | `augment.p_interferer=0.6`, `augment.sir_db=[0,10]` |
+| several voices at once | `augment.p_party=0.3` |
 | loud noise | `augment.snr_weights={"extreme":3,"very_noisy":2}`, `augment.clean_weight=0.2` |
 | reverberant rooms | `augment.p_reverb=0.8` |
 | phone audio | `augment.p_bandlimit=0.5`, `augment.p_codec=0.5` |

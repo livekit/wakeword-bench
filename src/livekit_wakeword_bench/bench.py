@@ -28,6 +28,7 @@ POSITIVE_AXES = [
     "reverb",
     "rir_category",
     "interferer",
+    "n_talkers",
     "eq_applied",
     "bandlimit",
     "clipping",
@@ -211,6 +212,7 @@ class BenchResult:
         media = self._media(
             neg[neg.category == "media"], stack, ti, int(ok[0]) if len(ok) else None
         )
+        party = self._party(df, stack, ti, int(ok[0]) if len(ok) else None)
         return {
             "detector": self.detector,
             "score": round(score, 4),
@@ -221,6 +223,7 @@ class BenchResult:
             "fpph_hours": round(neg_hours, 3),
             "at_threshold": op(ti),
             "media": media,
+            "party": party,
             "at_target_fpph": targets,
             "compute": {
                 "real_time_factor": round(float(comp.sum() / max(aud.sum(), 1e-9)), 5),
@@ -262,6 +265,41 @@ class BenchResult:
             for k, g in med.groupby("noise_type")
         }
         out["curve"] = _clean(fa(med))
+        return out
+
+    @staticmethod
+    def _party(df: Any, stack: Any, ti: int, score_idx: int | None) -> dict[str, Any] | None:
+        """Wake words said among several overlapping talkers + crowd babble (`augment.p_party`):
+        recall on party positives and the share of party negatives that trigger, at the operating
+        threshold and at the threshold that defines `score`. Party clips are part of `score` too."""
+        if "party" not in df or not df.party.fillna(False).astype(bool).any():
+            return None
+        p = df[df.party.fillna(False).astype(bool)]
+        pos, neg = p[p.label == 1], p[p.label == 0]
+
+        def at(curve: np.ndarray | None) -> dict[str, float | None]:
+            if curve is None:
+                return {"at_threshold": None, "at_score_threshold": None}
+            return {
+                "at_threshold": round(float(curve[ti]), 4),
+                "at_score_threshold": None
+                if score_idx is None
+                else round(float(curve[score_idx]), 4),
+            }
+
+        rec = stack(pos.detected).mean(0) if len(pos) else None
+        far = (stack(neg.events) > 0).mean(0) if len(neg) else None
+        out: dict[str, Any] = {
+            "n_positive": int(len(pos)),
+            "n_negative": int(len(neg)),
+            "recall": at(rec),
+            "false_accept_rate": at(far),
+        }
+        if len(pos) and "n_talkers" in pos:
+            out["recall_by_talkers"] = {
+                str(int(k)): round(float(stack(g.detected).mean(0)[ti]), 4)
+                for k, g in pos.groupby("n_talkers")
+            }
         return out
 
     def breakdown(self, threshold: float | None = None) -> dict[str, list[dict[str, Any]]]:

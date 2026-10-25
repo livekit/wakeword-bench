@@ -47,7 +47,9 @@ SCHEMA: dict[str, Any] = {
     "rir_file": "",
     "rir_category": "",
     "interferer": "",  # competing-talker corpus, "" if none
-    "sir_db": math.nan,  # target speech vs competing talker
+    "sir_db": math.nan,  # target speech vs competing talker (party: the loudest one)
+    "party": False,  # several overlapping talkers + crowd babble (noise_bucket "party")
+    "n_talkers": 0,  # competing talkers in a party scene
     "noise2_category": "",  # second layered noise
     "eq": "",  # mic coloration description, "" if none
     "bandlimit": "none",

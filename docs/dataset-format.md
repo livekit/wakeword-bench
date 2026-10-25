@@ -94,7 +94,8 @@ Every row has every column. When a column doesn't apply it holds `""`, `NaN`, `-
 | column | type | meaning |
 |---|---|---|
 | `reverb`, `rir_source`, `rir_file`, `rir_category` | bool, str | room reverb and which room |
-| `interferer`, `sir_db` | str, float | competing voice corpus and its level below the speaker |
+| `interferer`, `sir_db` | str, float | competing voice corpus and its level below the speaker (in a party: every corpus, and the loudest talker) |
+| `party`, `n_talkers` | bool, int | party scene: this many talkers over the speaker plus crowd babble (`noise_bucket` is `party`) |
 | `noise_bucket`, `snr_db` | str, float | noise level bucket and exact SNR |
 | `noise_source`, `noise_type`, `noise_category`, `noise_file` | str | which noise recording |
 | `noise2_category` | str | second layered noise, if any |

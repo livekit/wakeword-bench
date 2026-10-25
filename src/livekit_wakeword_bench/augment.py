@@ -130,6 +130,8 @@ class Augmenter:
         out = canvas.astype(np.float32).copy()
 
         talkers = self.pools.speech(self.pool) if self.pools else None
+        if allow_talker and ref is not None and talkers and rng.random() < a.p_party:
+            return self._party(out, ref, talkers, rng, meta)
         if allow_talker and ref is not None and talkers and rng.random() < a.p_interferer:
             item, talk, _ = talkers.sample_segment(rng, self.sr, len(out) / self.sr + 0.5)
             talk = fit_length(talk, len(out), rng)
@@ -172,6 +174,51 @@ class Augmenter:
         meta.update(noise_bucket=bucket, snr_db=snr if snr is not None else np.nan)
         return out
 
+    def _party(
+        self,
+        out: np.ndarray,
+        ref: float,
+        talkers: Any,
+        rng: np.random.Generator,
+        meta: dict[str, Any],
+    ) -> np.ndarray:
+        """Several overlapping talkers close by plus crowd babble: a kitchen, a party, an office.
+        Each talker is `party_sir_db` below the target speech; the babble is `party_babble_snr_db`."""
+        a = self.spec
+        n = int(rng.integers(a.party_talkers[0], a.party_talkers[1] + 1))
+        sirs, srcs = [], []
+        for _ in range(n):
+            item, talk, _ = talkers.sample_segment(rng, self.sr, len(out) / self.sr + 0.5)
+            talk = fit_length(talk, len(out), rng)
+            if rng.random() < 0.5:
+                talk = self.reverb(talk, rng, {})[: len(out)]
+            sir = float(rng.uniform(*a.party_sir_db))
+            out = out + _db_gain(talk, ref, sir)
+            sirs.append(sir)
+            srcs.append(item.source)
+        snr = None
+        pool = self.pools.noise(self.pool) if self.pools else None
+        got = pool.sample_type(rng, "babble", self.sr) if pool else None
+        if got is not None:
+            item, nz = got
+            snr = float(rng.uniform(*a.party_babble_snr_db))
+            out = out + _db_gain(fit_length(nz, len(out), rng), ref, snr)
+            meta.update(
+                noise_source=item.source,
+                noise_type=item.category.split("/")[0],
+                noise_category=item.category,
+                noise_file=item.name,
+            )
+        meta.update(
+            party=True,
+            n_talkers=n,
+            interferer="+".join(sorted(set(srcs))),
+            sir_db=min(sirs),  # the loudest competing talker
+            noise_bucket="party",
+            snr_db=snr if snr is not None else np.nan,
+        )
+        return out
+
     def device(self, x: np.ndarray, rng: np.random.Generator, meta: dict[str, Any]) -> np.ndarray:
         """Microphone / capture / transmission chain."""
         a = self.spec
@@ -200,7 +247,9 @@ class Augmenter:
         tags = []
         if meta.get("reverb"):
             tags.append("reverb")
-        if meta.get("interferer"):
+        if meta.get("party"):
+            tags.append("party")
+        elif meta.get("interferer"):
             tags.append("talker")
         if meta.get("noise_bucket") not in (None, "clean", "noise_only"):
             tags.append("noise")

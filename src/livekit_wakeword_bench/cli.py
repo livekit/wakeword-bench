@@ -367,6 +367,15 @@ def _print_summary(res: object) -> None:
     for k, v in s["at_target_fpph"].items():
         if v:
             console.print(f"  {k}: recall {v['recall']:.3f} @ thr {v['threshold']}")
+    pt = s.get("party")
+    if pt and pt["recall"]["at_threshold"] is not None:
+        far = pt["false_accept_rate"]["at_threshold"]
+        console.print(
+            f"  party ({pt['n_positive']} wake words, {pt['n_negative']} negatives among 2-4 "
+            f"talkers + babble): recall {pt['recall']['at_threshold']:.3f}"
+            + (f", false accepts {far:.3f}" if far is not None else "")
+            + f" @ thr {a['threshold']:.2f}"
+        )
     m = s.get("media")
     if m:
         kinds = ", ".join(f"{k} {v['at_threshold']:.2f}" for k, v in m["by_type"].items())
