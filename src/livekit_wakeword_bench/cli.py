@@ -191,6 +191,21 @@ def push(
     console.print(push_to_hub(root, repo_id, private=not public))
 
 
+@app.command("media")
+def media_cmd(
+    out: Path = typer.Option(Path("out/media"), "--out", "-o", help="Output dataset directory"),
+    hours: float = typer.Option(
+        1.0, help="Scale every source's hours (1.0 = the ~24 h default mix)"
+    ),
+) -> None:
+    """Build the long-form real-world negatives (TV/YouTube audio, music, podcasts) once."""
+    _env()
+    from .media import DEFAULT_HOURS, build_media
+
+    path = build_media(out, {k: v * hours for k, v in DEFAULT_HOURS.items()})
+    console.print(f"media negatives: {path}")
+
+
 @app.command()
 def bench(
     source: str = typer.Argument(DEFAULT_DATASET, help="Dataset dir or HF repo id"),
@@ -204,10 +219,13 @@ def bench(
     limit: int | None = typer.Option(None, help="Random subset size (quick runs)"),
     filters: list[str] = typer.Option([], "--filter", "-f", help="key=value[,value2]"),
     as_json: bool = typer.Option(False, "--json", help="Print machine-readable results only"),
+    media: Path | None = typer.Option(
+        None, "--media", help="Long-form negatives set (`lkwb media`): false alarms per hour"
+    ),
 ) -> None:
     """Benchmark detectors: results/<model>/*.json + results/report.html."""
     _env(quiet=as_json)
-    from .bench import BenchConfigRun, evaluate, run_detector
+    from .bench import BenchConfigRun, add_media, evaluate, run_detector
     from .detectors import load_detector
     from .loader import WakeWordData
     from .report import render_report
@@ -226,6 +244,8 @@ def bench(
             console.print(f"[bold]{name}[/] on {len(data)} clips")
         raw = run_detector(det, data, source=source, workers=workers, progress=not as_json)
         res = evaluate(raw, data, name, cfg)
+        if media is not None:
+            add_media(res, det, data, media, workers=workers, progress=not as_json)
         res.save(out / _safe(name))
         results.append(res)
         if not as_json:
@@ -347,6 +367,22 @@ def _print_summary(res: object) -> None:
     for k, v in s["at_target_fpph"].items():
         if v:
             console.print(f"  {k}: recall {v['recall']:.3f} @ thr {v['threshold']}")
+    pt = s.get("party")
+    if pt and pt["recall"]["at_threshold"] is not None:
+        far = pt["false_accept_rate"]["at_threshold"]
+        console.print(
+            f"  party ({pt['n_positive']} wake words, {pt['n_negative']} negatives among 2-4 "
+            f"talkers + babble): recall {pt['recall']['at_threshold']:.3f}"
+            + (f", false accepts {far:.3f}" if far is not None else "")
+            + f" @ thr {a['threshold']:.2f}"
+        )
+    m = s.get("media")
+    if m:
+        kinds = ", ".join(f"{k} {v['at_threshold']:.2f}" for k, v in m["by_type"].items())
+        console.print(
+            f"  media ({m['hours']} h): {m['at_threshold']:.2f} false alarms/h @ thr "
+            f"{a['threshold']:.2f} ({kinds}); {m['at_score_threshold']} @ the score threshold"
+        )
 
 
 @app.command("export-livekit")
