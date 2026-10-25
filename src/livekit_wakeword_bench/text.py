@@ -238,6 +238,10 @@ class TextSampler:
         self.positive_texts = positive_texts or [wake_word]
         self.p_carrier = p_carrier
         self.rng = rng
+        # sentences that say the wake word ("Alexa, play the news." for "alexa") are not negatives
+        self.filler = [t for t in FILLER_SPEECH if phonetic_distance(t, wake_word) > 0]
+        self.carrier_after = [t for t in CARRIER_AFTER if phonetic_distance(t, wake_word) > 0]
+        self.carrier_before = [t for t in CARRIER_BEFORE if phonetic_distance(t, wake_word) > 0]
         adv = adversarial_phrases(wake_word)
         self.adv = [(p, d) for p, d in adv] + [(h, 0) for h in hard_negatives]
         self.adv_weights = [{0: 6.0, 1: 4.0, 2: 2.0}.get(d, 1.0) for _, d in self.adv]
@@ -246,7 +250,7 @@ class TextSampler:
         r = self.rng.random()
         if r < self.p_carrier / 2:
             return Utterance(
-                [key_text.rstrip(".!?") + ",", self.rng.choice(CARRIER_AFTER)],
+                [key_text.rstrip(".!?") + ",", self.rng.choice(self.carrier_after)],
                 0,
                 "carrier_prefix",
                 phrase,
@@ -254,7 +258,7 @@ class TextSampler:
             )
         if r < self.p_carrier:
             return Utterance(
-                [self.rng.choice(CARRIER_BEFORE), key_text], 1, "carrier_suffix", phrase, distance
+                [self.rng.choice(self.carrier_before), key_text], 1, "carrier_suffix", phrase, distance
             )
         return Utterance([key_text], 0, "isolated", phrase, distance)
 
@@ -268,7 +272,7 @@ class TextSampler:
 
     def speech(self) -> Utterance:
         k = self.rng.choice([1, 1, 1, 2])
-        return Utterance([" ".join(self.rng.sample(FILLER_SPEECH, k))], None, "filler", "")
+        return Utterance([" ".join(self.rng.sample(self.filler, k))], None, "filler", "")
 
 
 def word_phones(word: str) -> list[list[str]]:

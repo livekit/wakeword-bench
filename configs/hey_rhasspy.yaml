@@ -1,0 +1,52 @@
+# Full benchmark + training set for "hey rhasspy".
+#   lkwb generate -c configs/hey_rhasspy.yaml -o out/hey_rhasspy
+#   lkwb push out/hey_rhasspy binhpham/wakeword-bench-hey-rhasspy
+name: hey_rhasspy
+wake_word: hey rhasspy
+pronunciations:
+  rhasspy: "R AE1 S | P IY0"
+# Surface forms: words are sent as phonemes, so only punctuation (prosody) varies.
+positive_texts: ["Hey Rhasspy", "Hey, Rhasspy!", "Hey Rhasspy?", "Hey Rhasspy.", "Hey, Rhasspy"]
+# Hand-picked confusables on top of the automatic CMUdict neighbours.
+hard_negatives: ["hey raspy", "hey rasp pie", "hey crispy", "hey wrasse pea", "hey happy"]
+p_carrier: 0.35
+seed: 1234
+
+tts:
+  models: []                 # empty = every phoneme-capable model in the catalog (157 voices)
+  # LiveKit Cloud plan -> max concurrent TTS connections: build 5, ship 20, scale 50.
+  # Enterprise: set `concurrency:` to your limit. Override: --concurrency / LKWB_TTS_CONCURRENCY.
+  plan: scale
+  test_voice_fraction: 0.3   # these voices only ever appear in the test split
+  speed: [0.85, 1.2]
+
+augment:
+  snr_buckets:               # name: [min_db, max_db]; one bucket sampled per clip
+    quiet: [20, 30]
+    moderate: [10, 20]
+    noisy: [5, 10]
+    very_noisy: [0, 5]
+    extreme: [-5, 0]
+  clean_weight: 1.0          # relative weight of "no noise" vs each bucket (default 1.0)
+  p_reverb: 0.5
+  p_bandlimit: 0.2
+  level_dbfs: [-30, -3]
+
+splits:
+  train:                     # clean utterances: training pipelines add their own augmentation
+    n_positive: 10000
+    n_adversarial: 10000
+    n_speech: 3000
+    augment: false
+  validation:
+    n_positive: 1000
+    n_adversarial: 1000
+    n_speech: 300
+    n_noise: 100
+    real_speech_minutes: 30
+  test:
+    n_positive: 3000
+    n_adversarial: 3000
+    n_speech: 1000
+    n_noise: 300
+    real_speech_minutes: 180   # FPPH denominator: hours of real conversational speech

@@ -410,3 +410,17 @@ def test_party_summary(tmp_path: Path) -> None:
     assert pt["false_accept_rate"]["at_threshold"] == 0.5
     assert pt["recall_by_talkers"] == {"3": 0.5}
     assert s["at_threshold"]["recall"] == 0.75  # party clips count in the headline too
+
+
+def test_negative_sentences_never_say_the_wake_word():
+    import random
+
+    from livekit_wakeword_bench.text import FILLER_SPEECH, TextSampler, phonetic_distance
+
+    for wake in ("alexa", "hey siri", "okay google", "hey livekit"):
+        s = TextSampler(wake, [wake], [], 0.35, random.Random(0))
+        assert all(phonetic_distance(t, wake) > 0 for t in s.filler + s.carrier_after + s.carrier_before)
+        for _ in range(200):
+            assert phonetic_distance(s.speech().text, wake) > 0
+    s = TextSampler("hey livekit", ["hey livekit"], [], 0.35, random.Random(0))
+    assert s.filler == FILLER_SPEECH  # unaffected wake words keep the exact same sentence pool (reproducible)
