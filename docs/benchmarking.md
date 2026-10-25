@@ -78,7 +78,7 @@ Every `hop_s` it scores the most recent `window_s` seconds. The stream starts wi
 
 | spec | meaning |
 |---|---|
-| `livekit:path/to/model.onnx` | livekit-wakeword model, run the way `WakeWordListener` runs it. v2 streaming models are fed each clip in 80 ms chunks through `WakeWordModel.process` (state reset per clip). v1 classifiers go through `WakeWordModel.predict` (2 s window, 80 ms hop). Needs `uv sync --extra livekit`. |
+| `livekit:path/to/model.onnx` | livekit-wakeword streaming model, run the way `WakeWordListener` runs it: each clip is fed in 80 ms chunks through `WakeWordModel.predict` (state reset per clip). Needs `uv sync --extra livekit`. |
 | `openwakeword:hey_jarvis` | openWakeWord pretrained name or model path, 80 ms frames. Needs `pip install openwakeword`. |
 | `my_pkg.models:make_model` | any factory function that returns a detector |
 | `my_pkg.models:make_model?size=small&name=v2` | the same, with string keyword arguments |

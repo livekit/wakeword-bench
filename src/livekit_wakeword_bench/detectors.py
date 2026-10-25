@@ -10,7 +10,7 @@ Models that only emit trigger events can return `Prediction.from_events([...])`.
 
 Detector spec strings (CLI `--detector`, or `load_detector()`):
 
-    livekit:path/to/hey_livekit.onnx          livekit-wakeword ONNX classifier
+    livekit:path/to/hey_livekit.onnx          livekit-wakeword streaming ONNX model
     openwakeword:hey_jarvis                   openWakeWord pretrained name or model path
     my_pkg.my_module:make_detector            any factory returning a Detector
     my_pkg.my_module:make_detector?key=value  ... with string kwargs
@@ -85,15 +85,17 @@ class SlidingWindowDetector:
 
 
 class LiveKitStreamingDetector:
-    """livekit-wakeword v2 streaming model: `WakeWordModel.predict` on consecutive 80 ms chunks,
+    """livekit-wakeword streaming model: `WakeWordModel.predict` on consecutive 80 ms chunks,
     exactly like `WakeWordListener` (state reset at the start of each clip)."""
 
-    def __init__(self, model: Any, key: str, name: str | None = None) -> None:
-        self._model = model
-        self._key = key
-        # streaming call: `predict()` in releases that also have `predict_clip()`, `process()` before
-        self._stream = model.predict if hasattr(model, "predict_clip") else model.process
-        self.name = name or f"livekit:{key}"
+    def __init__(self, model_path: str, name: str | None = None) -> None:
+        from pathlib import Path
+
+        from livekit.wakeword import WakeWordModel
+
+        self._model = WakeWordModel(models=[model_path])
+        self._key = Path(model_path).stem
+        self.name = name or f"livekit:{self._key}"
 
     def detect(self, audio: np.ndarray, sample_rate: int) -> Prediction:
         x = _resample(audio.astype(np.float32), sample_rate, 16000)
@@ -101,37 +103,16 @@ class LiveKitStreamingDetector:
         n = 1280
         times, scores = [], []
         for i in range(0, len(x) - n + 1, n):
-            scores.append(float(self._stream(x[i : i + n])[self._key]))
+            scores.append(float(self._model.predict(x[i : i + n])[self._key]))
             times.append((i + n) / 16000)
         return Prediction(np.array(times, np.float32), np.array(scores, np.float32))
 
 
 def livekit_detector(
     model_path: str, name: str | None = None, **kw: Any
-) -> SlidingWindowDetector | LiveKitStreamingDetector:
-    """livekit-wakeword ONNX model via its public API, fed the same way `WakeWordListener` does:
-    v2 streaming models streamed in 80 ms chunks, v1 classifiers scored on a 2 s window every
-    80 ms."""
-    from pathlib import Path
-
-    from livekit.wakeword import WakeWordModel
-
-    model = WakeWordModel(models=[model_path])
-    key = Path(model_path).stem
-    if getattr(model, "is_streaming", False):
-        return LiveKitStreamingDetector(model, key, name)
-
-    clip = getattr(model, "predict_clip", None) or model.predict  # whole-window scoring
-
-    def score(window: np.ndarray) -> float:
-        return float(clip(window)[key])
-
-    return SlidingWindowDetector(
-        score,
-        name=name or f"livekit:{key}",
-        window_s=float(kw.get("window_s", 2.0)),
-        hop_s=float(kw.get("hop_s", 0.08)),
-    )
+) -> LiveKitStreamingDetector:
+    """livekit-wakeword ONNX model, streamed through its public API like `WakeWordListener`."""
+    return LiveKitStreamingDetector(model_path, name)
 
 
 class OpenWakeWordDetector:
