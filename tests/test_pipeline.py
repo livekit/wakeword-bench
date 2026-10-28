@@ -120,7 +120,7 @@ def test_bench(ds_dir: Path, tmp_path: Path) -> None:
 
     again = BenchResult.load(out)
     assert again.summary()["at_threshold"] == a
-    html = render_report([res, again], tmp_path / "r.html", data=data).read_text()
+    html = render_report([res, again], tmp_path / "r.html", data=data).read_text(encoding="utf-8")
     assert "adv0" in html and "data:audio/wav;base64" in html
 
 

@@ -81,7 +81,7 @@ def init(
     if path.exists() and not force:
         console.print(f"[red]{path} exists[/] (use --force)")
         raise typer.Exit(1)
-    path.write_text(config_yaml(wake_word, plan, size))
+    path.write_text(config_yaml(wake_word, plan, size), encoding="utf-8")
     guesses, unknown = guess_pronunciations(wake_word)
     console.print(f"wrote [bold]{path}[/]")
     if guesses:

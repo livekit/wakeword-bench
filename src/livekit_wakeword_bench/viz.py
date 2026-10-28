@@ -618,6 +618,6 @@ def write_figures(res: BenchResult, out_dir: str | Path, prefix: str = "") -> li
             ("alarm_sources", alarm_sources(res, theme)),
         ):
             p = out / f"{prefix}{name}_{theme}.svg"
-            p.write_text(svg)
+            p.write_text(svg, encoding="utf-8")
             paths.append(p)
     return paths

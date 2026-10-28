@@ -442,7 +442,11 @@ def prepare_source(name: str, cache: Path, force: bool = False) -> list[Item]:
     d = source_dir(cache, name)
     manifest = d / "manifest.jsonl"
     if manifest.exists() and not force:
-        return [Item(**json.loads(line)) for line in manifest.read_text().splitlines() if line]
+        return [
+            Item(**json.loads(line))
+            for line in manifest.read_text(encoding="utf-8").splitlines()
+            if line
+        ]
     d.mkdir(parents=True, exist_ok=True)
     items: list[Item] = []
     from tqdm import tqdm
@@ -469,7 +473,7 @@ def prepare_source(name: str, cache: Path, force: bool = False) -> list[Item]:
                 transcript=str(extra.get("transcript", "")),
             )
         )
-    manifest.write_text("".join(json.dumps(asdict(i)) + "\n" for i in items))
+    manifest.write_text("".join(json.dumps(asdict(i)) + "\n" for i in items), encoding="utf-8")
     return items
 
 

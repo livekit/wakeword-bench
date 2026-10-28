@@ -58,7 +58,7 @@ def export_wav_folder(source: str | Path, out_dir: str | Path, split: str) -> Pa
     data = WakeWordData(source, split=split)
     d = Path(out_dir) / split
     d.mkdir(parents=True, exist_ok=True)
-    with open(d / "metadata.csv", "w", newline="") as f:
+    with open(d / "metadata.csv", "w", newline="", encoding="utf-8") as f:
         w: csv.DictWriter | None = None
         for s in tqdm(data, total=len(data), desc=f"export {split}"):
             sf.write(d / f"{s.id}.wav", s.audio, s.sample_rate)

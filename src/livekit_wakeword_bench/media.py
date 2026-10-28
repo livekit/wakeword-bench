@@ -181,7 +181,7 @@ def build_media(out: str | Path, hours: dict[str, float] | None = None) -> Path:
 
     out = Path(out)
     marker = out / "media_done.txt"  # sources written to the end, one per line
-    done = set(marker.read_text().split()) if marker.exists() else set()
+    done = set(marker.read_text(encoding="utf-8").split()) if marker.exists() else set()
     shards = sorted((out / "data").glob("media-*.parquet"))
     for f in shards:  # an interrupted source leaves partial shards: drop them, redo it
         if pq.read_table(f, columns=["provider"]).column(0)[0].as_py() not in done:
@@ -210,7 +210,7 @@ def build_media(out: str | Path, hours: dict[str, float] | None = None) -> Path:
             )
             n += 1
         w.flush()
-        with marker.open("a") as fh:
+        with marker.open("a", encoding="utf-8") as fh:
             fh.write(source + "\n")
         logger.info("[media] %s: %d clips (%.1f h)", source, n, n * CLIP_S / 3600)
     return out

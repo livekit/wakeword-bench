@@ -394,9 +394,11 @@ class BenchResult:
             out / "scores.npz", **{k: v[1].astype(np.float32) for k, v in self.traces.items()}
         )
         meta = {"detector": self.detector, "cfg": self.cfg.__dict__}
-        (out / "run.json").write_text(json.dumps(meta, indent=2))
-        (out / "summary.json").write_text(json.dumps(self.summary(), indent=2))
-        (out / "breakdown.json").write_text(json.dumps(self.breakdown(), indent=2))
+        (out / "run.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        (out / "summary.json").write_text(json.dumps(self.summary(), indent=2), encoding="utf-8")
+        (out / "breakdown.json").write_text(
+            json.dumps(self.breakdown(), indent=2), encoding="utf-8"
+        )
         return out
 
     def rescore(self, cfg: BenchConfigRun | None = None) -> BenchResult:
@@ -414,7 +416,7 @@ class BenchResult:
         import pandas as pd
 
         out = Path(out_dir)
-        meta = json.loads((out / "run.json").read_text())
+        meta = json.loads((out / "run.json").read_text(encoding="utf-8"))
         df = pd.read_parquet(out / "samples.parquet")
         rows = df.to_dict("records")
         for r in rows:

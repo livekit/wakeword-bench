@@ -57,9 +57,9 @@ class Voice:
 def load_voices(path: str | Path | None = None, models: list[str] | None = None) -> list[Voice]:
     """Load the voice catalog (bundled voices.json unless `path` is given)."""
     if path is None:
-        text = resources.files(__package__).joinpath("voices.json").read_text()
+        text = resources.files(__package__).joinpath("voices.json").read_text(encoding="utf-8")
     else:
-        text = Path(path).read_text()
+        text = Path(path).read_text(encoding="utf-8")
     data: dict[str, list[dict]] = json.loads(text)
     out: list[Voice] = []
     for model, voices in data.items():
