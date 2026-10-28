@@ -1,11 +1,13 @@
-# Docs
+# Documentation
 
-| I want to | Read |
+Start with the [README](../README.md) to install the package and run a benchmark.
+
+| Task | Guide |
 |---|---|
-| test a wake word model | [Benchmark](benchmark.md) |
-| make data for my own wake word | [Generate](generate.md) |
-| train on the data | [Train](train.md) |
-| look up a command, setting or column | [Reference](reference.md) |
-| work on this repo or cut a release | [Development](development.md) |
+| Run models, read results and compare changes | [Benchmark](benchmark.md) |
+| Generate and check a dataset | [Generate](generate.md) |
+| Load, augment and export training data | [Train](train.md) |
+| Look up commands, settings and data fields | [Reference](reference.md) |
+| Set up development and publish releases | [Development](development.md) |
 
-The usual loop: benchmark your model, find the condition it fails in, generate training data for that condition, train, and benchmark again.
+The workflow: benchmark → find weak conditions → generate training data → train → compare. Keep the test set separate from training throughout.

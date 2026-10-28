@@ -2,26 +2,72 @@
 
 ## Run it
 
+Requires Python 3.12+. Install the package and the adapter for your model:
+
 ```bash
-pip install livekit-wakeword-bench   # .onnx models also need livekit-wakeword v2
-lkwb bench hey_livekit.onnx --limit 1000   # quick: 1,000 clips
-lkwb bench hey_livekit.onnx                # the full test set
+pip install livekit-wakeword-bench livekit-wakeword
+lkwb bench hey_livekit.onnx --limit 1000  # quick check
+lkwb bench hey_livekit.onnx               # full test set
 ```
+
+`.onnx` files must be livekit-wakeword v2 streaming models. The default dataset is the public [Hey LiveKit test set](https://huggingface.co/datasets/binhpham/wakeword-bench-hey-livekit). Use `--data PATH_OR_REPO` for a local dataset or another Hugging Face dataset. No LiveKit credentials are needed.
+
+`--limit` selects a fixed random subset (seed 0). Compare runs with the same dataset, split, filters and limit; use a full run before reporting results.
 
 ```python
 from livekit_wakeword_bench import benchmark
 
-res = benchmark("hey_livekit.onnx", limit=1000)
-res.summary()["score"]
+result = benchmark("hey_livekit.onnx", limit=1000)
+print(result.summary()["score"])
+result.save("results/hey_livekit")
 ```
 
-By default it runs on the public [Hey LiveKit test set](https://huggingface.co/datasets/binhpham/wakeword-bench-hey-livekit) (7,873 clips, 12.3 h). Use `--data` for another one: a folder you generated or a Hugging Face repo. No LiveKit credentials needed.
+## Read the results
 
-`--limit` picks the same random clips every time, so quick runs are comparable with each other, but not with full runs.
+The CLI writes:
+
+```text
+results/
+  report.html          charts and playable failures
+  <model>/
+    summary.json       score and headline metrics
+    breakdown.json     metrics by condition, with 95% confidence intervals
+    samples.parquet    metadata and outcomes for each clip
+    times.npz          score timestamps
+    scores.npz         score traces
+```
+
+**Score** is recall at the lowest tested threshold with no more than 0.5 false alarms per hour (FPPH). Higher is better. Change the target with `--score-fpph`.
+
+The breakdown uses `--threshold` (default: 0.5), which can differ from the threshold used for the score.
+
+| Metric | Meaning |
+|---|---|
+| Recall | Share of wake words detected from phrase onset to 1 second after its end |
+| FPPH | Triggers per hour of ordinary speech, recorded speech and noise |
+| Adversarial false accept rate | Share of similar-sounding phrases, such as “hey live kid,” that trigger the model; excluded from FPPH |
+| Latency | Time from phrase end to trigger; negative means the trigger came before the phrase ended |
+| Real-time factor | Compute time divided by audio duration; measure with `--workers 1` |
+
+Breakdowns group clips by conditions such as noise, competing talkers, reverb, codec and accent. Red or green marks a clear difference from the average; gray means the difference is uncertain.
+
+Treat confidence intervals wider than about 0.2 as weak evidence. Synthesized wake words do not establish recall on real users, and accent labels come from TTS metadata. Rare false alarms need many hours of negative audio to measure reliably.
+
+## Compare models
+
+Save each run separately:
+
+```bash
+lkwb bench baseline.onnx --limit 1000 -o results/base
+lkwb bench candidate.onnx --limit 1000 -o results/new
+lkwb compare results/base/baseline results/new/candidate
+```
+
+Use the model directories printed by `bench`. The comparison shows headline changes, then conditions from worst regression to best improvement. Groups with fewer than 20 clips are skipped by default (`--min-n`). Positive `improvement` values mean better results.
 
 ## Your own model
 
-A model gets a whole clip and returns its score over time:
+A detector needs a `name` and a `detect` method. It receives a whole float32 mono clip and controls its own streaming:
 
 ```python
 import numpy as np
@@ -31,64 +77,40 @@ class MyModel:
     name = "my-model"
 
     def detect(self, audio: np.ndarray, sample_rate: int) -> Prediction:
-        times, scores = run_my_model(audio, sample_rate)  # stream it however your model streams
-        return Prediction(times, scores)                  # scores[i] after hearing times[i] seconds
+        times, scores = run_my_model(audio, sample_rate)  # replace with your code
+        return Prediction(times, scores)
 
-res = benchmark(MyModel(), limit=1000)
+result = benchmark(MyModel(), limit=1000)
 ```
 
-If your model only fires events, return `Prediction.from_events([1.9, 7.4])`.
+`scores[i]` must be the score emitted after hearing `times[i]` seconds of audio. For trigger-only models, return `Prediction.from_events([1.9, 7.4])`.
 
-From the command line, point at a function that returns your model: `lkwb bench my_pkg.models:make_model`.
+| Model | CLI argument | Extra dependency |
+|---|---|---|
+| livekit-wakeword v2 | `hey_livekit.onnx` | `livekit-wakeword` |
+| openWakeWord | `openwakeword:hey_jarvis` | `openwakeword` |
+| Custom factory | `my_pkg.models:make_model?size=small` | Your model's dependencies |
 
-| model | how to pass it |
-|---|---|
-| livekit-wakeword v2 (`.onnx`) | `hey_livekit.onnx` |
-| openWakeWord | `openwakeword:hey_jarvis` (`pip install openwakeword`) |
-| anything else | `my_pkg.models:make_model` (arguments: `make_model?size=small`) |
+A factory must return a detector. See [custom_detector.py](../examples/custom_detector.py).
 
-## Read the results
+## Add false-alarm hours
 
-```
-results/
-  report.html          charts, every condition, and failed clips you can play
-  <model>/
-    summary.json       the score and headline numbers
-    breakdown.json     every condition, with 95% confidence intervals
-    samples.parquet    one row per clip
-```
-
-**Score:** the share of wake words caught while false alarms stay at or below 0.5 per hour. Higher is better. Change the target with `--score-fpph`.
-
-| number | meaning |
-|---|---|
-| recall | wake words caught (between the start of the word and 1 s after it ends) |
-| false alarms per hour | triggers on speech, real conversation and noise that don't contain the wake word |
-| near-misses accepted | share of similar-sounding phrases ("hey live kid") that trigger it |
-| latency | time from the end of the wake word to the trigger (negative: before it ended) |
-| real-time factor | compute time ÷ audio time (use `--workers 1`) |
-
-The breakdown splits recall and false alarms by every condition: noise level and type, another voice, a party, room, codec, phrasing, accent and voice. In the report, a condition is red or green only when its confidence interval clearly differs from the average. Gray means no clear difference. Small groups have wide intervals, so read them with care.
-
-## Compare two models
+Build a separate set of TV, music and speeches, targeting 24 hours:
 
 ```bash
-uv run lkwb compare results/old/hey_livekit results/new/hey_livekit
+lkwb media -o out/media
+lkwb bench hey_livekit.onnx --media out/media
 ```
 
-It shows the change in the score, then the conditions that got worse and better.
+Media results appear in `summary()["media"]` and do not change the main score.
 
-## More false-alarm hours
+## Use in scripts
 
-The test set has about 6 hours of negative audio, which is too little to tell 0.5 from 0.1 false alarms per hour. Build a 24-hour set of TV, music and speeches once, then add it to any run:
+`bench --json` prints a JSON array with one object per detector. Each object includes `score`, `at_threshold`, `at_target_fpph`, `compute`, `worst_slices` and `run_dir`.
 
 ```bash
-uv run lkwb media -o out/media
-uv run lkwb bench hey_livekit.onnx --media out/media
+lkwb bench hey_livekit.onnx --limit 1000 --json > benchmark.json
+lkwb compare results/base/baseline results/new/candidate --json > comparison.json
 ```
 
-These hours are reported separately (`summary()["media"]`) and don't change the score.
-
-## For scripts and agents
-
-`--json` prints the score and the worst conditions, and `lkwb compare --json` prints every change. [AGENTS.md](../AGENTS.md) describes the full loop.
+`compare --json` returns `headline` and `slices`, limited to `--top` entries per direction (default: 10). Each slice includes `base`, `new`, `delta`, `improvement` and `n`; positive `improvement` means better.

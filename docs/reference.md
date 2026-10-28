@@ -2,18 +2,18 @@
 
 ## Commands
 
-Run `lkwb <command> --help` for every option.
+Use `lkwb <command> --help` for all options. From a repository checkout, prefix commands with `uv run`.
 
-| command | does |
+| Command | Purpose |
 |---|---|
 | `lkwb bench MODEL... [--data D] [--limit N] [--media DIR] [--json]` | benchmark models |
 | `lkwb compare OLD_RUN NEW_RUN [--json]` | what got better and worse |
 | `lkwb report RUN... [--threshold T]` | rebuild the HTML report from saved runs |
 | `lkwb figures RUN` | write the charts as SVG |
-| `lkwb media -o DIR` | build the 24 h TV / music / speech false-alarm set |
-| `lkwb generate "WAKE WORD" -o DIR [--size] [--plan] [--set k=v]` | generate a dataset |
+| `lkwb media -o DIR` | build a media false-alarm set (target: 24 hours) |
+| `lkwb generate "WAKE WORD" -o DIR [--size SIZE] [--plan PLAN] [--set k=v]` | generate a dataset |
 | `lkwb init "WAKE WORD"` | write a config file |
-| `lkwb pronounce "TEXT" [-c CONFIG]` | show what each TTS will say |
+| `lkwb pronounce "TEXT" [-c CONFIG]` | show pronunciation inputs for each provider |
 | `lkwb knobs [-c CONFIG]` | list every setting |
 | `lkwb voices [--check]` | list or test the TTS voices |
 | `lkwb verify DATASET` | check audio against labels |
@@ -22,24 +22,35 @@ Run `lkwb <command> --help` for every option.
 | `lkwb export-wav DATASET DIR` | export WAV files and a CSV |
 | `lkwb sources` | download the noise, room and speech recordings |
 
-`lkwb bench` options: `--threshold` (0.5) sets the threshold for the breakdown, `--score-fpph` (0.5) the false-alarm target, `--debounce` (2 s) the gap between counted triggers, `--filter key=value` runs on a subset, and `--workers N` runs in parallel (timing is only accurate with 1).
+Common `bench` options:
+
+| Option | Default | Purpose |
+|---|---|---|
+| `--threshold` | 0.5 | Threshold for breakdowns |
+| `--score-fpph` | 0.5 | False alarms per hour allowed for the score |
+| `--debounce` | 2 seconds | Minimum gap between counted triggers |
+| `--filter key=value` | None | Select clips by metadata |
+| `--workers` | 1 | Parallel processes; keep at 1 for accurate timing |
+| `-o DIR` | `results` | Output directory |
+
+See [Benchmark](benchmark.md#read-the-results) for metric definitions.
 
 ## Settings
 
-Change any setting with `--set key=value`, `generate(..., key__sub=value)` in Python, or a YAML file (`-c`). `lkwb knobs` lists them all.
+Set generation options with `--set key=value`, Python keywords such as `augment__p_reverb=0.8`, or YAML (`-c CONFIG`). Run `lkwb knobs` for the full list.
 
-| setting | default | does |
+| Setting | Default | Purpose |
 |---|---|---|
 | `wake_word` | `hey livekit` | the phrase |
 | `pronunciations` | | ARPAbet for unknown words |
 | `hard_negatives` | | extra near-miss phrases |
 | `p_carrier` | 0.35 | share of wake words inside a sentence |
-| `tts.plan` / `tts.concurrency` | build | TTS connections (5 / 20 / 50, or your number) |
+| `tts.plan` / `tts.concurrency` | `build` / unset | Connection preset (5 / 20 / 50) or explicit limit |
 | `tts.test_voice_fraction` | 0.3 | voices kept for the test split only |
 | `splits.<split>.n_positive`, `n_adversarial`, `n_speech`, `n_noise` | per `--size` | clips per kind |
 | `splits.<split>.real_speech_minutes` | per `--size` | recorded conversation |
 | `splits.<split>.augment` | train: false | store effects in the audio |
-| `augment.clean_weight` / `snr_weights` | 1 / all 1 | how often each noise level is used |
+| `augment.clean_weight` / `augment.snr_weights` | 1 / each bucket: 1 | Relative weights for clean audio and each noise level |
 | `augment.p_reverb` | 0.5 | room echo |
 | `augment.p_interferer` | 0.2 | another voice (0–20 dB quieter) |
 | `augment.p_party` | 0.1 | 2–4 voices plus crowd noise |
@@ -47,13 +58,15 @@ Change any setting with `--set key=value`, `generate(..., key__sub=value)` in Py
 | `augment.p_eq` / `p_bandlimit` / `p_clip` / `p_codec` | 0.4 / 0.15 / 0.05 / 0.25 | microphone, phone line, overload, compression |
 | `sources` | all | which recordings to use |
 
-Noise levels: `quiet` 20–30 dB, `moderate` 10–20, `noisy` 5–10, `very_noisy` 0–5, `extreme` −5–0 (noise louder than speech), plus `clean`.
+Noise buckets use signal-to-noise ratio (SNR): `quiet` 20–30 dB, `moderate` 10–20, `noisy` 5–10, `very_noisy` 0–5 and `extreme` −5–0. Lower SNR means louder noise relative to speech. `clean` adds no background noise.
+
+TTS shares capacity with production agents. Keep concurrency within your account limit and leave room for production. See [Generate](generate.md#set-tts-capacity).
 
 ## Dataset columns
 
-Each row is one 16 kHz clip with its recipe. The most useful columns:
+Each row contains a 16 kHz audio clip and metadata:
 
-| column | meaning |
+| Column | Meaning |
 |---|---|
 | `label`, `category` | 1 for the wake word; `positive`, `adversarial`, `speech`, `real_speech`, `noise`, `media` |
 | `text`, `phrase` | what was said; the wake word or near-miss in it |
@@ -69,7 +82,7 @@ The full list is `SCHEMA` in [`dataset.py`](../src/livekit_wakeword_bench/datase
 
 ## TTS providers
 
-Only providers that take phonemes are used, so every voice says the wake word the same way.
+The bundled providers accept phonemes to guide wake word pronunciation. Voice counts below describe the bundled catalog; use `lkwb voices` to inspect it.
 
 | provider | voices | "LiveKit" is sent as |
 |---|---|---|
@@ -80,7 +93,7 @@ Only providers that take phonemes are used, so every voice says the wake word th
 
 ## Audio sources
 
-Training and testing never share recordings.
+Training and validation use separate source pools from testing.
 
 | | noise | rooms | recorded speech |
 |---|---|---|---|
@@ -88,4 +101,17 @@ Training and testing never share recordings.
 | test | DEMAND, WHAM!, ESC-50, GTZAN | OpenSLR 28, Treble10 | AMI, Earnings-22, People's Speech |
 | media set | AudioSet (TV, YouTube), FMA music | | VoxPopuli speeches |
 
-WHAM!, ESC-50, Treble10 and GTZAN are for non-commercial use. To leave them out: `sources: [musan_noise, dns_noise, mit_rir, librispeech, demand, slr28_rir, ami, earnings22, peoples_speech]`.
+WHAM!, ESC-50, Treble10 and GTZAN have non-commercial or research-only restrictions. Check source licenses for your intended use. To exclude those four sources:
+
+```yaml
+sources:
+  - musan_noise
+  - dns_noise
+  - mit_rir
+  - librispeech
+  - demand
+  - slr28_rir
+  - ami
+  - earnings22
+  - peoples_speech
+```

@@ -1,56 +1,74 @@
 # Train
 
+Use this package to load, augment and export data; supply your own model training code. Never train on the `test` split or test sources.
+
 ## Load clips
 
 ```python
 from livekit_wakeword_bench import DEFAULT_DATASET, WakeWordData
 from livekit_wakeword_bench.loader import Augment
 
-train = WakeWordData(DEFAULT_DATASET, split="train")   # or "out/hey_jarvis"
+train = WakeWordData(DEFAULT_DATASET, split="train")  # or "out/hey_jarvis"
 train = train.with_transform(Augment()).windows(2.0)
-x, y = train.take(512).arrays()                         # numpy: (512, 32000), (512,)
+x, y = train.take(512).arrays()  # audio: (N, 32000), labels: (N,); N <= 512
 ```
 
-- `.windows(2.0)` cuts every clip to 2 s. Wake word clips end just after the wake word.
-- `Augment()` adds fresh noise, room echo, other voices and microphone effects every time a clip is read, using only training audio.
-- `.filter(...)` picks clips by any column: `train.filter(category="positive", noise_bucket="extreme")`.
+`Augment()` adds fresh noise, echo, voices and device effects on each read, using training sources. `.windows(2.0)` crops or pads clips to 2 seconds, placing positive windows near the end of the wake word.
 
-## PyTorch
+Use `.filter(category="positive")` to select clips by stored metadata. Filters do not select effects added later by `Augment()`.
+
+## Use PyTorch
+
+Install the optional dependency:
+
+```bash
+pip install 'livekit-wakeword-bench[torch]'
+```
+
+With `train` from the example above:
 
 ```python
 from torch.utils.data import DataLoader
 
-loader = DataLoader(train.torch(), batch_size=64, shuffle=True, num_workers=4,
-                    collate_fn=WakeWordData.collate)
+loader = DataLoader(
+    train.torch(), batch_size=64, shuffle=True,
+    num_workers=0, collate_fn=WakeWordData.collate,
+)
 ```
 
-Install with `uv sync --extra torch`.
+Each batch contains `(audio, labels, metadata)`. To use worker processes, increase `num_workers` and put DataLoader creation and iteration inside an `if __name__ == "__main__":` guard in your script.
 
-## Train more on a weak spot
+## Target a weak condition
 
-If the benchmark shows the model failing in one condition, raise it in the training data:
+Change augmentation settings based on benchmark results:
 
-| weak spot | setting |
+| Weak condition | Setting to try |
 |---|---|
-| another voice | `augment.p_interferer=0.6` |
-| several voices | `augment.p_party=0.3` |
-| loud noise | `augment.clean_weight=0.2` |
-| echoey rooms | `augment.p_reverb=0.8` |
-| phone audio | `augment.p_codec=0.5` |
+| Competing speaker | `augment.p_interferer=0.6` |
+| Several speakers | `augment.p_party=0.3` |
+| Too many clean examples | `augment.clean_weight=0.2` |
+| Loud noise | Increase `augment.snr_weights.extreme` |
+| Echo | `augment.p_reverb=0.8` |
+| Compressed audio | `augment.p_codec=0.5` |
+
+For example, add competing speakers more often:
 
 ```python
 from livekit_wakeword_bench import load_config
 from livekit_wakeword_bench.config import set_knob
 
-spec = set_knob(load_config(None), "augment.p_interferer", 0.6).augment
-train = WakeWordData(DEFAULT_DATASET, split="train").with_transform(Augment(spec=spec))
+config = set_knob(load_config(None), "augment.p_interferer", 0.6)
+train = WakeWordData(DEFAULT_DATASET, split="train")
+train = train.with_transform(Augment(spec=config.augment)).windows(2.0)
 ```
 
-## Export for livekit-wakeword
+You can also [generate augmented training clips](generate.md#understand-the-splits). After training, [compare the candidate against the baseline](benchmark.md#compare-models) on the same test data.
+
+## Export audio
 
 ```bash
-uv run lkwb export-livekit out/hey_jarvis <output_dir> --model-name hey_jarvis   # livekit-wakeword's layout
-uv run lkwb export-wav out/hey_jarvis exported/ --split train                   # WAV files + a CSV
+lkwb export-livekit out/hey_jarvis exported/livekit --model-name hey_jarvis
+lkwb export-wav out/hey_jarvis exported/wav --split train
 ```
 
-Never train on the `test` split. It only measures how well the model generalizes if the model has never heard those clips.
+`export-livekit` writes the livekit-wakeword training layout. `export-wav` writes WAV files and a CSV.

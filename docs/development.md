@@ -1,5 +1,9 @@
 # Development
 
+## Set up and check
+
+From the repository root:
+
 ```bash
 uv sync --all-extras --group dev
 uv run pytest
@@ -7,63 +11,61 @@ uv run ruff check src scripts tests examples
 uv run ruff format --check src scripts tests examples
 ```
 
-To run livekit-wakeword models, install v2 into the environment: `uv pip install livekit-wakeword` (or `-e ../livekit-wakeword` for a local checkout). It's not a declared dependency: `uv run` keeps it, but `uv sync` removes it, so reinstall after a sync.
+For livekit-wakeword v2 models, also run `uv pip install livekit-wakeword`, or `uv pip install -e ../livekit-wakeword` for a local checkout. Reinstall after `uv sync`, which removes this undeclared dependency.
 
-The tests run offline on a small synthetic dataset. CI runs them on Linux, macOS and Windows with Python 3.12 and 3.13, and checks that the built wheel installs and runs.
+Tests use a small synthetic dataset and run offline. CI tests Linux, macOS and Windows on Python 3.12 and 3.13, then checks the built wheel.
 
-## Rules
+## Code map
 
-- The library runs on Linux, macOS and Windows. No platform-specific code or dependencies in `src/`.
-- Whisper, matplotlib and other QA tools go in the `dev` group only, never in the package.
-- Train and test audio never share voices, noise, rooms or speakers.
+Files are under `src/livekit_wakeword_bench/` unless noted.
 
-## Layout
+| Area | Files |
+|---|---|
+| Benchmark and model adapters | `bench.py`, `detectors.py` |
+| Charts and reports | `viz.py`, `report.py` |
+| Data generation | `generate.py`, `text.py`, `phonemes.py`, `tts.py`, `voices.py` |
+| Audio sources and effects | `sources.py`, `augment.py`, `mix.py`, `media.py` |
+| Storage and loading | `dataset.py`, `loader.py` |
+| Configuration and CLI | `config.py`, `cli.py`, `scaffold.py` |
+| Exports and checks | `export.py`, `card.py`, `verify.py` |
+| Dataset QA and README charts | `scripts/qa_dataset.py`, `scripts/readme_figures.py` |
 
+Keep `src/` portable across supported platforms. Put QA dependencies, such as Whisper and matplotlib, in the `dev` group. Keep training and test voices, noise, rooms and speakers separate.
+
+## Extend the package
+
+| Add | Change |
+|---|---|
+| Model adapter | Register it in `_BUILTIN` in `detectors.py`; implement `name` and `detect(audio, sample_rate) -> Prediction` |
+| Audio source | Register a `SourceSpec` in `sources.py`; preserve train/test separation |
+| TTS voice | Update `voices.json`, then run `lkwb voices --check` |
+| TTS provider | Add phoneme syntax in `phonemes.py` and a test based on the provider's documented examples |
+| Breakdown | Add a column to `POSITIVE_AXES` or `NEGATIVE_AXES` in `bench.py` |
+
+To regenerate README figures from a local model:
+
+```bash
+uv run lkwb bench hey_livekit.onnx
+uv run --group dev python scripts/readme_figures.py results/hey_livekit \
+    --dataset binhpham/wakeword-bench-hey-livekit --model hey_livekit.onnx
 ```
-src/livekit_wakeword_bench/
-  bench.py        benchmark, metrics, breakdowns, compare
-  detectors.py    Detector protocol, livekit-wakeword and openWakeWord adapters
-  viz.py          charts
-  report.py       HTML report
-  generate.py     plan → TTS → mix → parquet
-  text.py         wake word forms, sentences, near-miss phrases
-  phonemes.py     ARPAbet → each provider's phoneme syntax
-  tts.py          LiveKit Inference TTS: concurrency, cache, retries
-  voices.py       voice list and held-out test voices
-  sources.py      noise, room and speech recordings
-  augment.py      effects chain
-  mix.py          signal processing
-  media.py        long-form TV, music and speech negatives
-  dataset.py      on-disk format
-  loader.py       WakeWordData, Augment, PyTorch
-  config.py       settings, sizes, plans
-  export.py, card.py, scaffold.py, verify.py, cli.py
-scripts/          dev tools: qa_dataset.py (Whisper check), readme_figures.py (README charts)
-```
-
-## Adding things
-
-- **A model adapter:** add it to `_BUILTIN` in `detectors.py`. A model only needs `name` and `detect(audio, sample_rate) -> Prediction`.
-- **An audio source:** `register(SourceSpec(...))` in `sources.py`. Keep train and test pools separate.
-- **A TTS voice:** add it to `voices.json`, then run `lkwb voices --check`.
-- **A TTS provider:** it must accept phonemes. Add its syntax to `phonemes.py` with a test pinned to the provider's documented examples.
-- **A breakdown:** add the column to `POSITIVE_AXES` or `NEGATIVE_AXES` in `bench.py`.
 
 ## Releasing
 
-The version comes from the git tag, so there is nothing to edit before a release. Pushing a `v*` tag runs [`publish.yml`](../.github/workflows/publish.yml). It builds the package, checks that the version matches the tag, installs the wheel in a clean environment, publishes to PyPI and creates a GitHub release with notes.
+Versions come from Git tags. Pushing a `v*` tag triggers [publish.yml](../.github/workflows/publish.yml): build, version check, clean wheel install, PyPI publish and GitHub release.
 
 One-time setup:
 
-1. On PyPI, add a [trusted publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/) for `livekit-wakeword-bench`: owner `livekit`, repository `wakeword-bench`, workflow `publish.yml`, environment `pypi`.
-2. On GitHub, create the `pypi` environment (Settings → Environments). Add required reviewers if releases need approval.
+1. Add a PyPI [trusted publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/) for `livekit-wakeword-bench`: owner `livekit`, repository `wakeword-bench`, workflow `publish.yml`, environment `pypi`.
+2. Create the `pypi` environment in GitHub Settings → Environments. Add reviewers if approval is required.
 
-Release:
+After checks pass, tag the intended commit on `main`. Replace the example version with the next release:
 
 ```bash
-git checkout main && git pull
+git checkout main
+git pull
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Pre-releases work the same way: `v0.2.0rc1`.
+Pre-releases use the same process, for example `v0.2.0rc1`.

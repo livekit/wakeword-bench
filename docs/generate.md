@@ -1,84 +1,104 @@
 # Generate
 
-Make a dataset for any wake word: TTS speech from 157 voices, mixed with real noise, rooms and other talkers.
+Create wake word clips with synthetic speech, then mix in real noise, rooms and competing speakers.
 
-## 1. Connect LiveKit
+## Connect LiveKit
 
-Speech comes from [LiveKit Inference](https://docs.livekit.io/agents/models/tts/inference/), so you need a LiveKit Cloud project. Install the [LiveKit CLI](https://docs.livekit.io/intro/basics/cli/), then:
-
-```bash
-lk cloud auth      # link your account (once)
-lk app env -w      # write your credentials to .env.local
-```
-
-## 2. Pick your plan
-
-LiveKit limits how many TTS connections run at once. Use your plan:
-
-| plan | flag | connections |
-|---|---|---|
-| Build (free) | `--plan build` (default) | 5 |
-| Ship | `--plan ship` | 20 |
-| Scale | `--plan scale` | 50 |
-| Enterprise | `--set tts.concurrency=N` | yours |
-
-> [!WARNING]
-> Your production voice agents use the same connections. Leave them room: `--set tts.concurrency=N` with N below your limit.
-
-## 3. Generate
+Generation uses [LiveKit Inference](https://docs.livekit.io/agents/models/tts/inference/) credits. Install the package ([quick start](../README.md#quick-start)) and the [LiveKit CLI](https://docs.livekit.io/intro/basics/cli/), then connect your project:
 
 ```bash
-uv run lkwb generate "hey jarvis" --size small --plan ship -o out/hey_jarvis
+lk cloud auth
+lk app env -w  # write credentials to .env.local
 ```
+
+## Make a dataset
+
+```bash
+lkwb generate "hey jarvis" --size small -o out/hey_jarvis
+```
+
+Or use Python:
 
 ```python
 from livekit_wakeword_bench import generate
-generate("hey jarvis", "out/hey_jarvis", size="small", plan="ship")
+
+generate("hey jarvis", "out/hey_jarvis", size="small", plan="build")
 ```
 
-| size | train | validation | test |
-|---|---|---|---|
-| `tiny` | 90 | — | ~250 |
-| `small` | 2,300 | ~280 | ~1,300 |
-| `default` | 23,000 | ~2,500 | ~7,900 |
+| Size | Use | Approximate train / validation / test clips |
+|---|---|---|
+| `tiny` | Smoke test | 90 / none / 250 |
+| `small` | First dataset | 2,300 / 280 / 1,300 |
+| `default` | Larger dataset | 23,000 / 2,500 / 7,900 |
 
-Ready-made configs for common wake words are in `configs/` (alexa, hey jarvis, hey mycroft, okay nabu, hey rhasspy, hey livekit): `lkwb generate -c configs/alexa.yaml -o out/alexa`.
-
-Speech is cached, so generating again with different noise settings is free.
-
-## Pronunciation
-
-Every voice says the wake word exactly the same way, because the wake word is sent to TTS as phonemes. Common English words just work. Names and made-up words need a pronunciation:
+Recorded speech is split into clips, so totals vary. Use `--split train` to generate only training data. Example configs are in [configs/](../configs/):
 
 ```bash
-uv run lkwb init "ok zorblax"                        # writes ok_zorblax.yaml, marks unknown words
-uv run lkwb pronounce "ok zorblax" -c ok_zorblax.yaml  # shows what each TTS will say
+lkwb generate -c configs/alexa.yaml -o out/alexa
 ```
+
+TTS audio is cached in `.cache/lkwb/tts`. Changing only augmentation reuses cached speech without new TTS charges.
+
+## Set TTS capacity
+
+Choose `--plan` to match your account. The tool's concurrency presets are:
+
+| Plan | Connections |
+|---|---|
+| `build` (default) | 5 |
+| `ship` | 20 |
+| `scale` | 50 |
+| `enterprise` | Set `tts.concurrency` explicitly |
+
+TTS connections are shared with production voice agents. Leave capacity for them and never exceed your account's limit:
+
+```bash
+lkwb generate "hey jarvis" --size small -o out/hey_jarvis --set tts.concurrency=2
+```
+
+## Set pronunciation
+
+The generator sends the wake word as phonemes to guide pronunciation across voices. For unknown names or made-up words, create and edit a config:
+
+```bash
+lkwb init "ok zorblax"  # writes ok_zorblax.yaml and marks unknown words
+```
+
+Add an ARPAbet pronunciation (`1` marks primary stress; `|` separates word parts):
 
 ```yaml
 pronunciations:
-  zorblax: "Z AO1 R B L AE2 K S"   # ARPAbet; 1 = stressed vowel, | between word parts
+  zorblax: "Z AO1 R B L AE2 K S"
 ```
 
-## What you get
+Inspect the provider inputs before generating:
 
-| clips | label | what |
-|---|---|---|
-| wake word | 1 | alone, or inside a sentence ("Hey Jarvis, set a timer") |
-| near-misses | 0 | phrases that sound almost right ("hey marius") |
-| speech | 0 | everyday sentences |
-| real speech | 0 | recorded meetings and calls |
-| noise | 0 | background noise only |
+```bash
+lkwb pronounce "ok zorblax" -c ok_zorblax.yaml
+```
 
-The test and validation splits get realistic effects: room echo, another voice, a party (several voices plus crowd noise), background noise from quiet to louder than speech, microphone and phone-line effects, and compression. The train split is stored clean, and training adds fresh effects ([Train](train.md)).
+## Understand the splits
 
-The test split uses different voices, noise recordings, rooms and real speakers than training, so it measures how well a model handles audio it has never heard.
+Each dataset includes wake words (label `1`) and negatives (label `0`): similar-sounding phrases, ordinary speech, recorded speech and noise.
+
+Training clips are stored clean by default; [add fresh effects while training](train.md). Validation and test clips include noise, echo, competing voices and device effects. Test voices, noise, rooms and recorded speakers are separate from training.
+
+To store more competing speech in a training dataset:
+
+```bash
+lkwb generate "hey livekit" -o out/train_v2 --split train \
+    --set splits.train.augment=true \
+    --set augment.p_interferer=0.6 \
+    --set augment.clean_weight=0.2
+```
+
+See [settings](reference.md#settings) for more controls and [audio sources](reference.md#audio-sources) for licensing restrictions.
 
 ## Check and share
 
 ```bash
-uv run lkwb verify out/hey_jarvis                       # audio matches its labels, no train/test overlap
-uv run lkwb push out/hey_jarvis you/wakeword-bench-hey-jarvis --public
+lkwb verify out/hey_jarvis
+lkwb push out/hey_jarvis you/wakeword-bench-hey-jarvis --public
 ```
 
-Every setting can be changed: see [Reference](reference.md#settings).
+`verify` checks audio, labels and split overlap. Listen to samples as well, especially unusual pronunciations. `push --public` uploads a public Hugging Face dataset.
