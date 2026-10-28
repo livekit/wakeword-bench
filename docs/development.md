@@ -7,6 +7,8 @@ uv run ruff check src scripts tests examples
 uv run ruff format --check src scripts tests examples
 ```
 
+To run livekit-wakeword models, install v2 into the environment: `uv pip install livekit-wakeword` (or `-e ../livekit-wakeword` for a local checkout). It's not a declared dependency: `uv run` keeps it, but `uv sync` removes it, so reinstall after a sync.
+
 The tests run offline on a small synthetic dataset. CI runs them on Linux, macOS and Windows with Python 3.12 and 3.13, and checks that the built wheel installs and runs.
 
 ## Rules

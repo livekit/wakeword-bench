@@ -94,14 +94,14 @@ class LiveKitDetector:
             from livekit.wakeword import WakeWordModel
         except ImportError as e:
             raise ImportError(
-                "livekit models need: pip install 'livekit-wakeword-bench[livekit]'"
+                "livekit models need livekit-wakeword v2 (streaming): pip install livekit-wakeword"
             ) from e
         if not hasattr(WakeWordModel, "reset"):
             from importlib.metadata import version
 
             raise ImportError(
                 f"livekit-wakeword {version('livekit-wakeword')} is the v1 API; the bench needs v2 "
-                "streaming models: pip install -U 'livekit-wakeword-bench[livekit]'"
+                "streaming models: pip install -U livekit-wakeword"
             )
         try:
             self._model = WakeWordModel(models=[model_path])

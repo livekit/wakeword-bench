@@ -29,17 +29,19 @@ Use the public “Hey LiveKit” dataset, generate one for your own phrase, or b
 
 ## Try it
 
-From a checkout of this repo, with Python 3.12+ and [uv](https://docs.astral.sh/uv/):
+With Python 3.12+:
 
 ```bash
-uv sync --extra livekit
+pip install livekit-wakeword-bench
 
 # Point this at your livekit-wakeword model.
-uv run lkwb bench path/to/hey_livekit.onnx --limit 1000
+lkwb bench path/to/hey_livekit.onnx --limit 1000
 
 # Run the full test set before reporting results.
-uv run lkwb bench path/to/hey_livekit.onnx
+lkwb bench path/to/hey_livekit.onnx
 ```
+
+`.onnx` models also need [livekit-wakeword](https://github.com/livekit/livekit-wakeword) v2 (streaming) installed. Any other model plugs in with a few lines of Python ([below](#bring-your-own-model)).
 
 The default dataset has 7,873 clips (12.3 hours). Each run saves JSON summaries, per-clip outcomes and score traces under `results/<model>/`, plus `results/report.html` with playable failures. Benchmarking existing data doesn't need LiveKit credentials. How the score and other numbers are computed: [Benchmark](docs/benchmark.md#read-the-results).
 
@@ -79,7 +81,7 @@ To reproduce with `hey_livekit.onnx` available locally:
 
 ```bash
 uv run lkwb bench hey_livekit.onnx
-uv run --group dev --extra livekit python scripts/readme_figures.py results/hey_livekit --dataset binhpham/wakeword-bench-hey-livekit --model hey_livekit.onnx
+uv run --group dev python scripts/readme_figures.py results/hey_livekit --dataset binhpham/wakeword-bench-hey-livekit --model hey_livekit.onnx
 ```
 
 </details>

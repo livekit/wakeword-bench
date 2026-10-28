@@ -49,7 +49,6 @@ lkwb = "livekit_wakeword_bench.cli:app"
 
 [project.optional-dependencies]
 torch = ["torch>=2.2"]
-livekit = ["livekit-wakeword>=0.3.0"]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]

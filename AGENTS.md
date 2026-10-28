@@ -13,7 +13,7 @@ Guide for coding agents that use this repo to build better wake word models.
 
 ```bash
 # 0. setup (once)
-uv sync --extra livekit --extra torch
+uv sync --extra torch                                 # plus livekit-wakeword v2 for .onnx models
 lk cloud auth && lk app env -w                        # only needed for generation
 
 # 1. baseline: quick iteration on a subset, full run before you claim a result

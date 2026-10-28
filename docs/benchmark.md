@@ -3,9 +3,9 @@
 ## Run it
 
 ```bash
-uv sync --extra livekit
-uv run lkwb bench hey_livekit.onnx --limit 1000   # quick: 1,000 clips
-uv run lkwb bench hey_livekit.onnx                # the full test set
+pip install livekit-wakeword-bench   # .onnx models also need livekit-wakeword v2
+lkwb bench hey_livekit.onnx --limit 1000   # quick: 1,000 clips
+lkwb bench hey_livekit.onnx                # the full test set
 ```
 
 ```python

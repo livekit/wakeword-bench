@@ -1,6 +1,6 @@
 """Build the README figures from a saved benchmark run (dev tool).
 
-    uv run --group dev --extra livekit python scripts/readme_figures.py results/hey_livekit \
+    uv run --group dev python scripts/readme_figures.py results/hey_livekit \
         --dataset binhpham/wakeword-bench-hey-livekit --model path/to/hey_livekit.onnx
 
 Teaser: one test clip the model detects, replayed with a second real voice at --sir dB.
