@@ -1,7 +1,8 @@
-"""Static SVG charts: one soft light theme, rounded marks, few words.
+"""Static SVG charts in the LiveKit style: flat cards, square marks, few words.
 
 Charts carry almost no text: labels, values, axes. Explanations belong in captions.
-Colors are colorblind-safe: blue means caught or better, coral means missed or worse.
+The LiveKit accent (blue in light, cyan in dark) means caught or better; red means missed or
+worse. `set_theme("dark")` switches every chart drawn after it to the dark palette.
 """
 
 from __future__ import annotations
@@ -15,33 +16,77 @@ import numpy as np
 
 from .bench import THRESHOLDS, BenchResult, wilson
 
-SANS = "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-MONO = "ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace"
+SANS = "'Public Sans', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+MONO = "'Commit Mono', 'CommitMono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
 DISPLAY = SANS
 
-PALETTE = {
-    "fg0": "#1d1d1f",  # titles, values
-    "fg1": "#3d3c39",  # labels
-    "fg2": "#5f5e5a",  # secondary labels
-    "fg3": "#8d8c87",  # axes, notes
-    "fg4": "#b4b3ad",  # faint
-    "bg0": "#f6f6f3",  # page
-    "bg1": "#ffffff",  # card
-    "bg2": "#f7f7f4",  # tile, hover
-    "bg3": "#efeee9",  # bar track
-    "separator1": "#ebeae5",
-    "separator2": "#dddcd6",
-    "accent": "#3b82e6",
-    "better": "#3b82e6",
-    "worse": "#e8655c",
-    "neutral": "#c9c8c1",
-    "wave": "#d3d2cc",
+# LiveKit design tokens (livekit/web DESIGN.md), as used by the LiveKit Portal figures
+THEMES: dict[str, dict[str, Any]] = {
+    "light": {
+        "palette": {
+            "fg0": "#000000",  # titles, values
+            "fg1": "#3B3B3B",  # labels
+            "fg2": "#4D4D4D",  # secondary labels
+            "fg3": "#636363",  # axes, notes
+            "fg4": "#707070",  # faint
+            "bg0": "#FDFDFC",  # page
+            "bg1": "#FFFFFF",  # card
+            "bg2": "#EFEFEC",  # tile, hover
+            "bg3": "#E2E2DF",  # bar track
+            "separator1": "#DBDBD8",
+            "separator2": "#BDBDBB",
+            "grid": "#E2E2DF",
+            "accent": "#002CF2",
+            "better": "#002CF2",
+            "worse": "#FA4C39",
+            "neutral": "#BDBDBB",
+            "wave": "#D4D4D1",
+        },
+        "series": ("#002CF2", "#EF8B01", "#009E4F", "#BA1FF9", "#FA4C39", "#636363"),
+        "red": ("#FFA9A0", "#FF7566", "#FA4C39", "#B32909"),
+    },
+    "dark": {
+        "palette": {
+            "fg0": "#FFFFFF",
+            "fg1": "#CCCCCC",
+            "fg2": "#B2B2B2",
+            "fg3": "#999999",
+            "fg4": "#666666",
+            "bg0": "#000000",
+            "bg1": "#070707",
+            "bg2": "#131313",
+            "bg3": "#1F1F1F",
+            "separator1": "#202020",
+            "separator2": "#30302F",
+            "grid": "#1F1F1F",
+            "accent": "#1FD5F9",
+            "better": "#1FD5F9",
+            "worse": "#FF7566",
+            "neutral": "#4A4A48",
+            "wave": "#3A3A39",
+        },
+        "series": ("#1FD5F9", "#FFB752", "#23DE6B", "#DC85FF", "#FF7566", "#999999"),
+        "red": ("#FFA9A0", "#FF7566", "#FA4C39", "#B32909"),
+    },
 }
-# multi-model series, in fixed order (validated adjacent pairs, light surface)
-SERIES = ("#3b82e6", "#eb6834", "#1baf7a", "#6250d6", "#e87ba4", "#eda100")
-# coral, light to dark: a second voice from very quiet to loud
-CORAL = ("#f19a92", "#e8655c", "#d24c43", "#b0392f")
-RADIUS = 14  # card corners
+PALETTE: dict[str, str] = dict(THEMES["light"]["palette"])
+# multi-model series, in fixed order
+SERIES: tuple[str, ...] = THEMES["light"]["series"]
+# red, light to dark: a second voice from very quiet to loud
+CORAL: tuple[str, ...] = THEMES["light"]["red"]
+RADIUS = 6  # card corners
+MARK = 1  # bar and track corners
+
+
+def set_theme(name: str) -> None:
+    """Draw the following charts with the "light" (default) or "dark" palette."""
+    global SERIES, CORAL
+    t = THEMES[name]
+    PALETTE.clear()
+    PALETTE.update(t["palette"])
+    SERIES, CORAL = t["series"], t["red"]
+
+
 NUM = 'style="font-variant-numeric:tabular-nums"'
 
 
@@ -49,10 +94,24 @@ def _e(x: Any) -> str:
     return html.escape(str(x))
 
 
+def _grid(w: int, h: int) -> str:
+    """The card's background grid, fading out from the center."""
+    lines = "".join(f'<line x1="{x}" y1="0" x2="{x}" y2="{h}"/>' for x in range(50, w, 50))
+    lines += "".join(f'<line x1="0" y1="{y}" x2="{w}" y2="{y}"/>' for y in range(50, h, 50))
+    k = f"{w}x{h}"  # one id per card size: hstack puts several cards in one document
+    return (
+        f'<defs><radialGradient id="gridfade{k}" cx="50%" cy="50%" r="65%">'
+        '<stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>'
+        f'</radialGradient><mask id="gridmask{k}"><rect width="{w}" height="{h}" '
+        f'fill="url(#gridfade{k})"/></mask></defs>'
+        f'<g stroke="{PALETTE["grid"]}" stroke-width="1" mask="url(#gridmask{k})">{lines}</g>'
+    )
+
+
 def _svg(w: int, h: int, body: str, card: bool = True) -> str:
     bg = (
         f'<rect x="0.5" y="0.5" width="{w - 1}" height="{h - 1}" rx="{RADIUS}" '
-        f'fill="{PALETTE["bg1"]}" stroke="{PALETTE["separator1"]}"/>'
+        f'fill="{PALETTE["bg1"]}" stroke="{PALETTE["separator1"]}"/>' + _grid(w, h)
         if card
         else ""
     )
@@ -72,7 +131,7 @@ def _text(
     num: bool = False,
     weight: int = 400,
 ) -> str:
-    style = f" {NUM}" if num else ""
+    style = f' font-family="{_e(MONO)}" {NUM}' if num else ""
     return (
         f'<text x="{x:.1f}" y="{y:.1f}" fill="{c}" font-size="{size}" text-anchor="{anchor}"'
         f' font-weight="{weight}"{style}>{_e(s)}</text>'
@@ -100,15 +159,15 @@ def _frame(title: str, legend: list[tuple[str, str]] | None = None, w: int = 880
 
 
 def _bar_row(sx: Any, x0: float, cy: float, v: float, lo: float, hi: float, col: str) -> str:
-    """A rounded bar on a full-width track, with its 95% interval as a thin line."""
+    """A bar on a full-width track, with its 95% interval as a thin line."""
     c, hh = PALETTE, 6
     out = (
         f'<rect x="{x0}" y="{cy - hh:.1f}" width="{sx(1) - x0:.1f}" height="{2 * hh}" '
-        f'rx="{hh}" fill="{c["bg3"]}"/>'
+        f'rx="{MARK}" fill="{c["bg3"]}"/>'
     )
     out += (
         f'<rect x="{x0}" y="{cy - hh:.1f}" width="{max(sx(v) - x0, 2 * hh):.1f}" height="{2 * hh}" '
-        f'rx="{hh}" fill="{col}"/>'
+        f'rx="{MARK}" fill="{col}"/>'
     )
     out += (
         f'<line x1="{sx(lo):.1f}" y1="{cy:.1f}" x2="{sx(hi):.1f}" y2="{cy:.1f}" '
@@ -126,13 +185,14 @@ def _tone(lo: float, hi: float, ref: float, good_high: bool = True) -> str:
 
 
 def _pill(x: float, y: float, label: str, col: str, anchor: str = "start") -> str:
-    """A small tinted label, e.g. caught / missed."""
-    w = len(label) * 6.6 + 18
+    """A small tinted tag, e.g. CAUGHT / MISSED (mono caps, as in the LiveKit Portal figures)."""
+    w = len(label) * 7.2 + 16
     x0 = x if anchor == "start" else x - w
     return (
-        f'<rect x="{x0:.1f}" y="{y - 14:.1f}" width="{w:.1f}" height="20" rx="10" '
-        f'fill="{col}" fill-opacity="0.12"/>'
-        + _text(x0 + w / 2, y + 0.5, label, col, 11.5, "middle", weight=600)
+        f'<rect x="{x0:.1f}" y="{y - 14:.1f}" width="{w:.1f}" height="20" rx="2" '
+        f'fill="{col}" fill-opacity="0.14"/>'
+        f'<text x="{x0 + w / 2:.1f}" y="{y:.1f}" fill="{col}" font-size="10" text-anchor="middle" '
+        f'font-weight="700" letter-spacing="0.6" font-family="{_e(MONO)}">{_e(label.upper())}</text>'
     )
 
 
@@ -237,7 +297,7 @@ def recall_by_talker(res: BenchResult, w: int = 380, h: int = 380) -> str:
         lo, hi = wilson(float(g.hit.sum()), len(g))
         cx = L + (i + 0.5) * bw
         col = c["better"] if i == 0 else CORAL[min(i - 1, len(CORAL) - 1)]
-        y, b, rr = sy(r), sy(0), min(6, (sy(0) - sy(r)) / 2)
+        y, b, rr = sy(r), sy(0), min(MARK, (sy(0) - sy(r)) / 2)
         x0, x1 = cx - cw / 2, cx + cw / 2
         out.append(
             f'<path d="M{x0:.1f},{b:.1f} V{y + rr:.1f} Q{x0:.1f},{y:.1f} {x0 + rr:.1f},{y:.1f} '
@@ -288,7 +348,7 @@ def scorecard(res: BenchResult, w: int = 880) -> str:
         x = PAD + (i % cols) * (tw + gap)
         y = PAD + (i // cols) * (th + gap)
         out.append(
-            f'<rect x="{x:.1f}" y="{y}" width="{tw:.1f}" height="{th}" rx="10" fill="{c["bg2"]}"/>'
+            f'<rect x="{x:.1f}" y="{y}" width="{tw:.1f}" height="{th}" rx="{MARK + 1}" fill="{c["bg2"]}"/>'
         )
         out.append(_text(x + 20, y + 32, label, c["fg3"], 12, weight=500))
         out.append(_text(x + 20, y + 72, value, col, 28, num=True, weight=600))
@@ -313,7 +373,7 @@ def tradeoff(results: list[BenchResult], w: int = 880, h: int = 420) -> str:
 
     tgt = results[0].cfg.score_fpph if results else 0.5
     out.append(
-        f'<rect x="{L}" y="{T}" width="{lx(tgt) - L:.1f}" height="{h - T - B}" rx="8" '
+        f'<rect x="{L}" y="{T}" width="{lx(tgt) - L:.1f}" height="{h - T - B}" rx="{MARK}" '
         f'fill="{c["better"]}" fill-opacity="0.07"/>'
     )
     out.append(_text(L + 10, h - B - 12, "target", c["better"], 11.5, weight=600))
@@ -572,11 +632,11 @@ def alarm_sources(res: BenchResult, w: int = 880) -> str:
         bw = (R - L) * v / mx
         out.append(_text(L - 16, cy + 4, name, c["fg2"], 12.5, "end"))
         out.append(
-            f'<rect x="{L}" y="{cy - 6:.1f}" width="{R - L:.1f}" height="12" rx="6" fill="{c["bg3"]}"/>'
+            f'<rect x="{L}" y="{cy - 6:.1f}" width="{R - L:.1f}" height="12" rx="{MARK}" fill="{c["bg3"]}"/>'
         )
         if v > 0:
             out.append(
-                f'<rect x="{L}" y="{cy - 6:.1f}" width="{max(bw, 12):.1f}" height="12" rx="6" '
+                f'<rect x="{L}" y="{cy - 6:.1f}" width="{max(bw, 12):.1f}" height="12" rx="{MARK}" '
                 f'fill="{c["worse"]}"/>'
             )
         out.append(_text(R + 16, cy + 4.5, f"{v:.1f}", c["fg0"], 13, num=True, weight=600))
