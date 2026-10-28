@@ -39,10 +39,10 @@ def main() -> None:
 
     res = BenchResult.load(args.run)
     out = Path(args.out)
-    for theme in ("dark", "light"):
-        fig = failures(res, theme, axes=README_AXES, significant_only=True)
-        (out / f"failures_{theme}.svg").write_text(fig, encoding="utf-8")
-        (out / f"near_misses_{theme}.svg").write_text(near_misses(res, theme), encoding="utf-8")
+    (out / "failures.svg").write_text(
+        failures(res, axes=README_AXES, significant_only=True), encoding="utf-8"
+    )
+    (out / "near_misses.svg").write_text(near_misses(res), encoding="utf-8")
 
     det = load_detector(args.model)
     thr = res.cfg.threshold
@@ -84,9 +84,8 @@ def main() -> None:
                 "scores": both.scores,
             },
         ]
-        for theme in ("dark", "light"):
-            fig = hstack([traces(ex, thr, theme, w=539), recall_by_talker(res, theme)], theme)
-            (out / f"teaser_{theme}.svg").write_text(fig, encoding="utf-8")
+        fig = hstack([traces(ex, thr, w=560), recall_by_talker(res)])
+        (out / "teaser.svg").write_text(fig, encoding="utf-8")
         print(
             f"teaser from {s.id} ({s.meta['provider']}/{s.meta['voice_name']}): "
             f"{alone.scores.max():.2f} alone, {both.scores.max():.2f} with a voice at {args.sir:g} dB"

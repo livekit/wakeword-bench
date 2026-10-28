@@ -12,10 +12,7 @@ It's a small failure, but a hard one to debug. Does the model need more examples
 
 We can isolate one of those possibilities by playing the same recording with and without a competing speaker. In the example below, adding a voice quieter than the wake word is enough to turn a detection into a miss.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/teaser_dark.svg">
-  <img alt="One clip is detected alone and missed with a second voice; recall falls from 94% to 65% as the second voice gets louder" src="assets/teaser_light.svg">
-</picture>
+<img alt="One clip is detected alone and missed with a second voice; recall falls from 94% to 65% as the second voice gets louder" src="assets/teaser.svg">
 
 The clip's score drops from 0.96 to 0.15 with a competing voice 5 dB quieter. Across 3,000 test wake words, recall falls from 94% to 65% as that voice gets louder.
 
@@ -60,20 +57,14 @@ The average hides where it fails. These results use the default threshold:
 | Noise louder than speech | 80% recall | More examples in loud noise |
 | Near-miss phrases | 30% trigger the model; “hey live kid” 77% | More adversarial negatives |
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/failures_dark.svg">
-  <img alt="Recall by condition, with 95% confidence intervals: another voice, noise and one TTS provider are below average" src="assets/failures_light.svg">
-</picture>
+<img alt="Recall by condition, with 95% confidence intervals: another voice, noise and one TTS provider are below average" src="assets/failures.svg">
 
 Red is clearly worse than average, green clearly better, gray too close to call. Whiskers show 95% confidence intervals.
 
 <details>
 <summary>Near-miss phrases</summary>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/near_misses_dark.svg">
-  <img alt="Changing one word of hey live kit triggers the model 27 to 33% of the time; hey live kid triggers it 77% of the time" src="assets/near_misses_light.svg">
-</picture>
+<img alt="Changing one word of hey live kit triggers the model 27 to 33% of the time; hey live kid triggers it 77% of the time" src="assets/near_misses.svg">
 
 Changing one word still triggers the model about a third of the time.
 
