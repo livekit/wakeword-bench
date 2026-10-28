@@ -1,5 +1,12 @@
 """Generate wake word datasets and benchmark any wake word model."""
 
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("livekit-wakeword-bench")
+except PackageNotFoundError:  # running from a source tree without an install
+    __version__ = "0.0.0"
+
 from .bench import BenchConfigRun, BenchResult, benchmark, compare, evaluate, run_detector
 from .config import BenchConfig, load_config, make_config
 from .dataset import DEFAULT_DATASET
@@ -8,6 +15,7 @@ from .generate import generate
 from .loader import Sample, WakeWordData
 
 __all__ = [
+    "__version__",
     "DEFAULT_DATASET",
     "BenchConfig",
     "BenchConfigRun",

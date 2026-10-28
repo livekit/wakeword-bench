@@ -13,11 +13,11 @@ Guide for coding agents that use this repo to build better wake word models.
 
 ```bash
 # 0. setup (once)
-uv sync --extra livekit --extra torch
+uv sync --extra torch                                 # plus livekit-wakeword v2 for .onnx models
 lk cloud auth && lk app env -w                        # only needed for generation
 
 # 1. baseline: quick iteration on a subset, full run before you claim a result
-uv run lkwb bench -d livekit:baseline.onnx --limit 1000 --json -o results/base
+uv run lkwb bench baseline.onnx --limit 1000 --json -o results/base
 
 # 2. read results/base/*/summary.json and breakdown.json (or the --json stdout):
 #    find the worst slices with tight confidence intervals
@@ -30,8 +30,8 @@ uv run lkwb generate "hey livekit" -o out/train_v2 --plan ship --split train \
 # 4. train (your code; WakeWordData(...).with_transform(Augment()).torch() for PyTorch)
 
 # 5. compare the candidate against the baseline, slice by slice
-uv run lkwb bench -d livekit:candidate.onnx --limit 1000 --json -o results/cand
-uv run lkwb compare results/base/livekit_baseline results/cand/livekit_candidate --json
+uv run lkwb bench candidate.onnx --limit 1000 --json -o results/cand
+uv run lkwb compare results/base/baseline results/cand/candidate --json
 ```
 
 ## Rules
@@ -47,13 +47,13 @@ uv run lkwb compare results/base/livekit_baseline results/cand/livekit_candidate
 `lkwb bench --json` prints one object per detector:
 
 ```json
-{"detector": "livekit:model", "score": 0.4463, "score_definition": "recall at FPPH <= 0.5",
- "at_threshold": {"threshold": 0.5, "recall": 0.76, "fpph": 28.9, "false_accept_rate": 0.088,
-                  "adversarial_false_accept_rate": 0.589, "latency_ms_p50": -64, "latency_ms_p90": 127},
+{"detector": "hey_livekit", "score": 0.8983, "score_definition": "recall at FPPH <= 0.5",
+ "at_threshold": {"threshold": 0.5, "recall": 0.911, "fpph": 1.31, "false_accept_rate": 0.004,
+                  "adversarial_false_accept_rate": 0.299, "latency_ms_p50": -18.5, "latency_ms_p90": 83.7},
  "at_target_fpph": {"fpph<=1.0": {...}, "fpph<=0.5": {...}, "fpph<=0.1": {...}},
- "compute": {"real_time_factor": 0.21, ...},
- "worst_slices": {"positive/interferer": [{"value": "earnings22", "n": 203, "recall": 0.38, "ci95": [0.32, 0.45]}], ...},
- "run_dir": "results/base/livekit_model"}
+ "compute": {"real_time_factor": 0.0066, ...},
+ "worst_slices": {"positive/interferer": [{"value": "peoples_speech", "n": 215, "recall": 0.78, "ci95": [0.72, 0.83]}], ...},
+ "run_dir": "results/base/hey_livekit"}
 ```
 
 `run_dir` contains:
@@ -72,7 +72,7 @@ A detector is any object with `name` and `detect(audio: np.ndarray, sample_rate:
 - `Prediction(times, scores)` is a score timeline: `scores[i]` was emitted after hearing `times[i]` seconds of audio.
 - A model that only emits triggers can return `Prediction.from_events([t1, t2])`.
 
-From the CLI, pass `-d module.path:factory?key=value`. Built-ins are `livekit:<model.onnx>` and `openwakeword:<name>`. See `examples/custom_detector.py`.
+From the CLI, pass `module.path:factory?key=value` as the model. A `.onnx` path is a livekit-wakeword v2 streaming model, and `openwakeword:<name>` is openWakeWord. From Python: `benchmark(model, dataset=..., limit=...)`. See `examples/custom_detector.py`.
 
 ## Knobs
 
@@ -110,4 +110,4 @@ The ones you'll use most:
 | `verify.py` | dataset QA |
 | `cli.py` | `lkwb` |
 
-Tests: `uv run pytest`. Lint: `uv run ruff check src tests`.
+Tests: `uv run pytest`. Lint: `uv run ruff check src tests`. Releasing: [docs/development.md](docs/development.md#releasing).

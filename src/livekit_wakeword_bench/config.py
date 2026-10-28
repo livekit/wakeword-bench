@@ -213,5 +213,5 @@ def make_config(
 def load_config(path: str | Path | None) -> BenchConfig:
     if path is None:
         return BenchConfig()
-    data = yaml.safe_load(Path(path).read_text()) or {}
+    data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     return BenchConfig.model_validate(data)

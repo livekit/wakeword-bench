@@ -120,7 +120,7 @@ def test_bench(ds_dir: Path, tmp_path: Path) -> None:
 
     again = BenchResult.load(out)
     assert again.summary()["at_threshold"] == a
-    html = render_report([res, again], tmp_path / "r.html", data=data).read_text()
+    html = render_report([res, again], tmp_path / "r.html", data=data).read_text(encoding="utf-8")
     assert "adv0" in html and "data:audio/wav;base64" in html
 
 
@@ -419,8 +419,12 @@ def test_negative_sentences_never_say_the_wake_word():
 
     for wake in ("alexa", "hey siri", "okay google", "hey livekit"):
         s = TextSampler(wake, [wake], [], 0.35, random.Random(0))
-        assert all(phonetic_distance(t, wake) > 0 for t in s.filler + s.carrier_after + s.carrier_before)
+        assert all(
+            phonetic_distance(t, wake) > 0 for t in s.filler + s.carrier_after + s.carrier_before
+        )
         for _ in range(200):
             assert phonetic_distance(s.speech().text, wake) > 0
     s = TextSampler("hey livekit", ["hey livekit"], [], 0.35, random.Random(0))
-    assert s.filler == FILLER_SPEECH  # unaffected wake words keep the exact same sentence pool (reproducible)
+    assert (
+        s.filler == FILLER_SPEECH
+    )  # unaffected wake words keep the exact same sentence pool (reproducible)

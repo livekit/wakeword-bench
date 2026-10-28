@@ -1564,21 +1564,7 @@ wheels = [
 ]
 
 [[package]]
-name = "livekit-wakeword"
-version = "0.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "onnxruntime" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/16/9a/3af06750535bbe90e2b0c65018ddc514465e76398ab4f2a4d7f0c625c0e9/livekit_wakeword-0.3.0.tar.gz", hash = "sha256:0a5d22e3434fa87cc09ce8ee3c6a140790971b64a6a1c084e3a390e3b6c2ec0e", size = 1895594, upload-time = "2026-09-30T21:07:42.039Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/33/cc1682755d3e626faefa1def3b761f6b6826a0498a514246b54bd5e9ecbc/livekit_wakeword-0.3.0-py3-none-any.whl", hash = "sha256:6bb00b832c21720ebb94410e005854740b2d36b20970c7cecc74b5e889d94f4b", size = 1917287, upload-time = "2026-09-30T21:07:37.831Z" },
-]
-
-[[package]]
 name = "livekit-wakeword-bench"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -1601,9 +1587,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-livekit = [
-    { name = "livekit-wakeword" },
-]
 torch = [
     { name = "torch" },
 ]
@@ -1622,7 +1605,6 @@ requires-dist = [
     { name = "datasets", specifier = ">=3" },
     { name = "huggingface-hub", specifier = ">=2.2.0" },
     { name = "livekit-agents", specifier = ">=1.2" },
-    { name = "livekit-wakeword", marker = "extra == 'livekit'", specifier = ">=0.3.0" },
     { name = "numpy", specifier = ">=2.5.4" },
     { name = "pandas", specifier = ">=3.0.6" },
     { name = "pronouncing", specifier = ">=0.3.0" },
@@ -1638,7 +1620,7 @@ requires-dist = [
     { name = "typer", specifier = ">=0.27.3" },
     { name = "wordfreq", specifier = ">=3.1.1" },
 ]
-provides-extras = ["torch", "livekit"]
+provides-extras = ["torch"]
 
 [package.metadata.requires-dev]
 dev = [

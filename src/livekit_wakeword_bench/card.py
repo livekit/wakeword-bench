@@ -63,7 +63,7 @@ def write_card(root: Path, cfg: BenchConfig, stats: dict[str, Any], gen: Any = N
         'data = WakeWordData("<this repo>", split="test")',
         'noisy_misses = data.filter(category="positive", noise_bucket=["very_noisy", "extreme"])',
         "",
-        'result = benchmark("livekit:hey_livekit.onnx", "<this repo>")',
+        'result = benchmark("hey_livekit.onnx", "<this repo>")',
         'print(result.summary()["at_threshold"])',
         "```",
         "",
@@ -127,7 +127,7 @@ def write_card(root: Path, cfg: BenchConfig, stats: dict[str, Any], gen: Any = N
         "",
     ]
     path = root / "README.md"
-    path.write_text("\n".join(lines))
+    path.write_text("\n".join(lines), encoding="utf-8")
     return path
 
 
@@ -137,8 +137,8 @@ def push_to_hub(root: str | Path, repo_id: str, private: bool = True) -> str:
     api = HfApi()
     api.create_repo(repo_id, repo_type="dataset", private=private, exist_ok=True)
     card = Path(root) / "README.md"
-    if card.exists() and "<this repo>" in card.read_text():
-        card.write_text(card.read_text().replace("<this repo>", repo_id))
+    if card.exists() and "<this repo>" in card.read_text(encoding="utf-8"):
+        card.write_text(card.read_text(encoding="utf-8").replace("<this repo>", repo_id))
     api.upload_folder(
         folder_path=str(root),
         repo_id=repo_id,

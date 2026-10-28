@@ -425,10 +425,12 @@ def _slices(
         if len(rows) < 2:
             continue
         rows = sorted(rows, key=lambda r: -r["recall"])
-        if significant_only and not any(
-            r["ci95"][1] < overall or r["ci95"][0] > overall for r in rows
-        ):
-            continue
+        if significant_only:
+            # keep the conditions that clearly differ from the average, plus the best for reference
+            sig = [r for r in rows if r["ci95"][1] < overall or r["ci95"][0] > overall]
+            if not sig:
+                continue
+            rows = [rows[0]] + [r for r in sig if r is not rows[0]]
         for r in rows:
             r["label"] = names.get(r["value"], r["value"] or "none")
         groups.append((title, rows))
@@ -600,20 +602,22 @@ def hstack(svgs: list[str], theme: str = "dark", gap: int = 1) -> str:
     )
 
 
+README_AXES = ["interferer", "noise_bucket", "noise_type", "reverb", "accent", "provider"]
+
+
 def write_figures(res: BenchResult, out_dir: str | Path, prefix: str = "") -> list[Path]:
-    """README charts as <name>_{dark,light}.svg."""
+    """Charts as <name>_{dark,light}.svg."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     paths = []
-    readme_axes = ["text_form", "accent", "noise_bucket", "noise_type", "reverb"]
     for theme in ("dark", "light"):
         for name, svg in (
             ("tradeoff", tradeoff([res], theme)),
-            ("failures", failures(res, theme, axes=readme_axes, significant_only=True)),
+            ("failures", failures(res, theme, axes=README_AXES, significant_only=True)),
             ("near_misses", near_misses(res, theme)),
             ("alarm_sources", alarm_sources(res, theme)),
         ):
             p = out / f"{prefix}{name}_{theme}.svg"
-            p.write_text(svg)
+            p.write_text(svg, encoding="utf-8")
             paths.append(p)
     return paths

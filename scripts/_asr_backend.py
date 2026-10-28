@@ -45,14 +45,14 @@ class ASRCache:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.data: dict[str, str] = {}
         if self.path.exists():
-            for line in self.path.read_text().splitlines():
+            for line in self.path.read_text(encoding="utf-8").splitlines():
                 if line:
                     r = json.loads(line)
                     self.data[r["key"]] = r["text"]
 
     def add(self, key: str, text: str) -> None:
         self.data[key] = text
-        with open(self.path, "a") as f:
+        with open(self.path, "a", encoding="utf-8") as f:
             f.write(json.dumps({"key": key, "text": text}) + "\n")
 
 

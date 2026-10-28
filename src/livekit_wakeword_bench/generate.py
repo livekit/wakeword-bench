@@ -364,7 +364,7 @@ class Generator:
             }
             logger.info("[%s] wrote %d rows (%.2f h)", split, writer.n_rows, writer.seconds / 3600)
         (self.out / "bench_config.yaml").write_text(
-            yaml.safe_dump(self.cfg.model_dump(mode="json"), sort_keys=False)
+            yaml.safe_dump(self.cfg.model_dump(mode="json"), sort_keys=False), encoding="utf-8"
         )
         from .card import write_card
 

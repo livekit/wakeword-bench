@@ -319,5 +319,5 @@ def render_report(
     )
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(page)
+    out.write_text(page, encoding="utf-8")
     return out

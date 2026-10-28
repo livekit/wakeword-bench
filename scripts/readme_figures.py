@@ -1,7 +1,7 @@
 """Build the README figures from a saved benchmark run (dev tool).
 
-    uv run --extra livekit python scripts/readme_figures.py results/livekit_hey_livekit \
-        --dataset out/hey_livekit --model path/to/hey_livekit.onnx
+    uv run --group dev python scripts/readme_figures.py results/hey_livekit \
+        --dataset binhpham/wakeword-bench-hey-livekit --model path/to/hey_livekit.onnx
 
 Teaser: one test clip the model detects, replayed with a second real voice at --sir dB.
 """
@@ -17,7 +17,14 @@ from livekit_wakeword_bench import WakeWordData, load_detector
 from livekit_wakeword_bench.bench import BenchResult
 from livekit_wakeword_bench.mix import active_rms, fit_length
 from livekit_wakeword_bench.sources import load_pools
-from livekit_wakeword_bench.viz import hstack, recall_by_talker, traces, write_figures
+from livekit_wakeword_bench.viz import (
+    README_AXES,
+    failures,
+    hstack,
+    near_misses,
+    recall_by_talker,
+    traces,
+)
 
 
 def main() -> None:
@@ -31,9 +38,13 @@ def main() -> None:
     args = ap.parse_args()
 
     res = BenchResult.load(args.run)
-    write_figures(res, args.out)
+    out = Path(args.out)
+    for theme in ("dark", "light"):
+        fig = failures(res, theme, axes=README_AXES, significant_only=True)
+        (out / f"failures_{theme}.svg").write_text(fig, encoding="utf-8")
+        (out / f"near_misses_{theme}.svg").write_text(near_misses(res, theme), encoding="utf-8")
 
-    det = load_detector(f"livekit:{args.model}")
+    det = load_detector(args.model)
     thr = res.cfg.threshold
     data = WakeWordData(args.dataset, "test").filter(
         category="positive", noise_bucket="clean", reverb=False, interferer="", text_form="isolated"
@@ -75,7 +86,7 @@ def main() -> None:
         ]
         for theme in ("dark", "light"):
             fig = hstack([traces(ex, thr, theme, w=539), recall_by_talker(res, theme)], theme)
-            (Path(args.out) / f"teaser_{theme}.svg").write_text(fig)
+            (out / f"teaser_{theme}.svg").write_text(fig, encoding="utf-8")
         print(
             f"teaser from {s.id} ({s.meta['provider']}/{s.meta['voice_name']}): "
             f"{alone.scores.max():.2f} alone, {both.scores.max():.2f} with a voice at {args.sir:g} dB"
