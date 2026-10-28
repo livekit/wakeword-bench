@@ -25,17 +25,41 @@ from livekit_wakeword_bench import generate
 generate("hey jarvis", "out/hey_jarvis", size="small", plan="build")
 ```
 
-| Size | Use | Approximate train / validation / test clips |
-|---|---|---|
-| `tiny` | Smoke test | 90 / none / 250 |
-| `small` | First dataset | 2,300 / 280 / 1,300 |
-| `default` | Larger dataset | 23,000 / 2,500 / 7,900 |
-
-Recorded speech is split into clips, so totals vary. Use `--split train` to generate only training data. Example configs are in [configs/](../configs/):
+Add `--split test` for a benchmark only, or `--split train` for training data only. Without `--split`, all configured splits are generated. Example configs are in [configs/](../configs/):
 
 ```bash
 lkwb generate -c configs/alexa.yaml -o out/alexa
 ```
+
+The output directory contains `data/<split>-*.parquet` shards, `bench_config.yaml` with the generation recipe, and a dataset card. Rows include audio, labels, phrase timestamps, voice information and augmentation metadata; see [dataset columns](reference.md#dataset-columns). Use the directory with `lkwb bench --data`, `WakeWordData`, or the export commands.
+
+## Choose sample counts
+
+Choose a preset explicitly with `--size`. Counts below are fixed except recorded speech, which is requested in minutes and cut into variable-length clips.
+
+| Size | Split | Positive | Adversarial | Synthesized speech | Noise | Recorded speech (minutes) |
+|---|---|---:|---:|---:|---:|---:|
+| `tiny` | train | 40 | 40 | 10 | 0 | 0 |
+| | test | 100 | 100 | 30 | 10 | 5 |
+| `small` | train | 1,000 | 1,000 | 300 | 0 | 0 |
+| | validation | 100 | 100 | 30 | 20 | 10 |
+| | test | 500 | 500 | 150 | 50 | 30 |
+| `default` | train | 10,000 | 10,000 | 3,000 | 0 | 0 |
+| | validation | 1,000 | 1,000 | 300 | 100 | 30 |
+| | test | 3,000 | 3,000 | 1,000 | 300 | 180 |
+
+`tiny` has no validation split. Omitting `--size` uses the config's counts, which need not match `--size default`.
+
+Override individual counts after choosing a preset:
+
+```bash
+lkwb generate "hey jarvis" --size small --split test -o out/jarvis_benchmark \
+    --set splits.test.n_positive=2000 \
+    --set splits.test.n_adversarial=2000 \
+    --set splits.test.real_speech_minutes=180
+```
+
+See [what gets generated](../README.md#what-gets-generated) for the purpose of each category and [evaluation criteria](../README.md#how-models-are-evaluated) for how it contributes to metrics.
 
 TTS audio is cached in `.cache/lkwb/tts`. Changing only augmentation reuses cached speech without new TTS charges.
 
