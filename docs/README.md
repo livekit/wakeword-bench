@@ -1,13 +1,13 @@
 # Documentation
 
-Start with the [README](../README.md) to install the package and run a benchmark.
+Start with the [README](../README.md) to generate a dataset and understand its samples, audio conditions and evaluation criteria.
 
 | Task | Guide |
 |---|---|
-| Run models, read results and compare changes | [Benchmark](benchmark.md) |
-| Generate and check a dataset | [Generate](generate.md) |
+| Generate a benchmark or training dataset for your phrase | [Generate](generate.md) |
+| Look up sample fields, audio sources and settings | [Reference](reference.md) |
 | Load, augment and export training data | [Train](train.md) |
-| Look up commands, settings and data fields | [Reference](reference.md) |
+| Evaluate a detector on your dataset and compare results | [Benchmark](benchmark.md) |
 | Set up development and publish releases | [Development](development.md) |
 
-The workflow: benchmark → find weak conditions → generate training data → train → compare. Keep the test set separate from training throughout.
+Keep the generated test set fixed and separate from training when comparing models.

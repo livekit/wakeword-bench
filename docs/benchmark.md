@@ -1,13 +1,15 @@
 # Benchmark
 
+Evaluate your detector on a [generated benchmark](generate.md) or an existing dataset. For sample categories and coverage, see [what gets generated](../README.md#what-gets-generated).
+
 ## Run it
 
 Requires Python 3.12+. Install the package and the adapter for your model:
 
 ```bash
 pip install livekit-wakeword-bench livekit-wakeword
-lkwb bench hey_livekit.onnx --limit 1000  # quick check
-lkwb bench hey_livekit.onnx               # full test set
+lkwb bench your_model.onnx --data out/hey_jarvis --limit 1000  # quick check
+lkwb bench your_model.onnx --data out/hey_jarvis               # full test set
 ```
 
 `.onnx` files must be livekit-wakeword v2 streaming models. The default dataset is the public [Hey LiveKit test set](https://huggingface.co/datasets/binhpham/wakeword-bench-hey-livekit). Use `--data PATH_OR_REPO` for a local dataset or another Hugging Face dataset. No LiveKit credentials are needed.
