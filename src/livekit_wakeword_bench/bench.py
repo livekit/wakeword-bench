@@ -566,8 +566,8 @@ def evaluate(
 
 
 def benchmark(
-    detector: str | Detector,
-    source: str | Path = DEFAULT_DATASET,
+    model: str | Detector,
+    dataset: str | Path = DEFAULT_DATASET,
     split: str = "test",
     cfg: BenchConfigRun | None = None,
     workers: int = 1,
@@ -575,24 +575,27 @@ def benchmark(
     media: str | Path | None = None,
     **filters: Any,
 ) -> BenchResult:
-    """Benchmark a detector (object or spec string) on a dataset dir / HF repo id.
+    """Benchmark a model on a dataset (local dir or HF repo id, default: the public set).
 
-    res = benchmark("livekit:model.onnx", limit=500)   # quick run on the public set
+    `model`: a livekit-wakeword v2 `.onnx` path, a detector spec, or a Detector object.
+
+    res = benchmark("hey_livekit.onnx", limit=500)   # quick run on the public set
     res.summary()["score"]; res.breakdown(); res.failures(); res.save("results/x")
 
     `media`: a long-form negatives set (`lkwb media`): also report false alarms per hour on it
     (`summary()["media"]`). Clips whose transcript says the wake word are left out.
     """
-    data = WakeWordData(source, split=split)
+    data = WakeWordData(dataset, split=split)
     if filters:
         data = data.filter(**filters)
     if limit:
         data = data.shuffle(0).take(limit)
-    det_name = detector if isinstance(detector, str) else detector.name
-    if workers <= 1 and isinstance(detector, str):
-        detector = load_detector(detector)
+    detector: str | Detector = model
+    det_name = model if isinstance(model, str) else model.name
+    if workers <= 1:
+        detector = load_detector(model)
         det_name = detector.name
-    res = run_detector(detector, data, source=str(source), workers=workers)
+    res = run_detector(detector, data, source=str(dataset), workers=workers)
     out = evaluate(res, data, det_name, cfg)
     if media is not None:
         add_media(out, detector, data, media, workers=workers)

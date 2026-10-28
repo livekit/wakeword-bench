@@ -6,3 +6,4 @@ results/
 .env.local
 .env
 *.egg-info/
+src/livekit_wakeword_bench/_version.py

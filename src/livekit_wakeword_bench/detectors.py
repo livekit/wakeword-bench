@@ -8,9 +8,10 @@ what recall/FPPH sweeps and detection latency are computed from.
 
 Models that only emit trigger events can return `Prediction.from_events([...])`.
 
-Detector spec strings (CLI `--detector`, or `load_detector()`):
+Detector specs (CLI `lkwb bench SPEC`, or `load_detector()`):
 
-    livekit:path/to/hey_livekit.onnx          livekit-wakeword streaming ONNX model
+    path/to/hey_livekit.onnx                  livekit-wakeword v2 streaming model
+    livekit:path/to/hey_livekit.onnx          the same
     openwakeword:hey_jarvis                   openWakeWord pretrained name or model path
     my_pkg.my_module:make_detector            any factory returning a Detector
     my_pkg.my_module:make_detector?key=value  ... with string kwargs
@@ -84,18 +85,32 @@ class SlidingWindowDetector:
         return Prediction((ends - self.window) / self.sample_rate, scores)
 
 
-class LiveKitStreamingDetector:
-    """livekit-wakeword streaming model: `WakeWordModel.predict` on consecutive 80 ms chunks,
-    exactly like `WakeWordListener` (state reset at the start of each clip)."""
+class LiveKitDetector:
+    """A livekit-wakeword v2 streaming model, run like `WakeWordListener`: the state is reset at
+    the start of each clip, then the clip is fed in 80 ms steps."""
 
     def __init__(self, model_path: str, name: str | None = None) -> None:
-        from pathlib import Path
+        try:
+            from livekit.wakeword import WakeWordModel
+        except ImportError as e:
+            raise ImportError(
+                "livekit models need: pip install 'livekit-wakeword-bench[livekit]'"
+            ) from e
+        if not hasattr(WakeWordModel, "reset"):
+            from importlib.metadata import version
 
-        from livekit.wakeword import WakeWordModel
-
-        self._model = WakeWordModel(models=[model_path])
-        self._key = Path(model_path).stem
-        self.name = name or f"livekit:{self._key}"
+            raise ImportError(
+                f"livekit-wakeword {version('livekit-wakeword')} is the v1 API; the bench needs v2 "
+                "streaming models: pip install -U 'livekit-wakeword-bench[livekit]'"
+            )
+        try:
+            self._model = WakeWordModel(models=[model_path])
+        except ValueError as e:
+            raise ValueError(
+                f"{model_path} is not a livekit-wakeword v2 streaming model: {e}"
+            ) from e
+        self._key = self._model.model_names[0]
+        self.name = name or self._key
 
     def detect(self, audio: np.ndarray, sample_rate: int) -> Prediction:
         x = _resample(audio.astype(np.float32), sample_rate, 16000)
@@ -106,13 +121,6 @@ class LiveKitStreamingDetector:
             scores.append(float(self._model.predict(x[i : i + n])[self._key]))
             times.append((i + n) / 16000)
         return Prediction(np.array(times, np.float32), np.array(scores, np.float32))
-
-
-def livekit_detector(
-    model_path: str, name: str | None = None, **kw: Any
-) -> LiveKitStreamingDetector:
-    """livekit-wakeword ONNX model, streamed through its public API like `WakeWordListener`."""
-    return LiveKitStreamingDetector(model_path, name)
 
 
 class OpenWakeWordDetector:
@@ -140,13 +148,19 @@ class OpenWakeWordDetector:
 
 
 _BUILTIN: dict[str, Callable[..., Any]] = {
-    "livekit": livekit_detector,
+    "livekit": LiveKitDetector,
     "openwakeword": OpenWakeWordDetector,
 }
 
 
-def load_detector(spec: str) -> Detector:
-    """Build a detector from a spec string (see module docstring)."""
+def load_detector(spec: str | Detector) -> Detector:
+    """A detector from a spec (see module docstring); a Detector object is returned as is."""
+    if not isinstance(spec, str):
+        return spec
+    if spec.split("?")[0].endswith(".onnx") and not spec.startswith(
+        tuple(f"{k}:" for k in _BUILTIN)
+    ):
+        spec = f"livekit:{spec}"
     spec, _, query = spec.partition("?")
     kwargs = dict(parse_qsl(query))
     kind, _, arg = spec.partition(":")

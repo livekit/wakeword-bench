@@ -258,7 +258,11 @@ class TextSampler:
             )
         if r < self.p_carrier:
             return Utterance(
-                [self.rng.choice(self.carrier_before), key_text], 1, "carrier_suffix", phrase, distance
+                [self.rng.choice(self.carrier_before), key_text],
+                1,
+                "carrier_suffix",
+                phrase,
+                distance,
             )
         return Utterance([key_text], 0, "isolated", phrase, distance)
 

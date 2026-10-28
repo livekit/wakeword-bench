@@ -1,6 +1,6 @@
 [project]
 name = "livekit-wakeword-bench"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Generate wake word datasets (LiveKit Inference TTS + real noise) and benchmark any wake word model"
 readme = "README.md"
 license = "Apache-2.0"
@@ -52,8 +52,20 @@ torch = ["torch>=2.2"]
 livekit = ["livekit-wakeword>=0.3.0"]
 
 [build-system]
-requires = ["uv_build>=0.9.26,<0.10.0"]
-build-backend = "uv_build"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/livekit_wakeword_bench/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/livekit_wakeword_bench"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/livekit_wakeword_bench", "README.md", "LICENSE"]
 
 [dependency-groups]
 dev = [

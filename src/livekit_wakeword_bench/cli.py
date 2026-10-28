@@ -63,7 +63,7 @@ def _parse_filters(filters: list[str]) -> dict[str, object]:
     return out
 
 
-@app.command()
+@app.command(rich_help_panel="Generate data")
 def init(
     wake_word: str = typer.Argument(..., help='e.g. "hey jarvis"'),
     plan: str = typer.Option("build", help="LiveKit plan: build (5) / ship (20) / scale (50)"),
@@ -71,7 +71,7 @@ def init(
     out: Path | None = typer.Option(None, "--out", "-o", help="Config path (default: <name>.yaml)"),
     force: bool = typer.Option(False, help="Overwrite an existing file"),
 ) -> None:
-    """Write a starter config for a new wake word (pronunciations, plan, split sizes)."""
+    """Write a config file for a new wake word."""
     import re
 
     from .scaffold import config_yaml, guess_pronunciations, preview
@@ -94,12 +94,12 @@ def init(
     console.print(f"next: lkwb generate -c {path} -o out/{name}")
 
 
-@app.command()
+@app.command(rich_help_panel="Generate data")
 def knobs(
     config: Path | None = typer.Option(None, "--config", "-c", help="Show values from this config"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Every config key you can set with `--set key=value` (or `generate(..., a__b=v)`)."""
+    """List every setting and its value."""
     from .config import load_config
 
     def flat(d: dict, prefix: str = "") -> dict:
@@ -124,12 +124,12 @@ def knobs(
         console.print(f"{k:40s} {json.dumps(v)}")
 
 
-@app.command()
+@app.command(rich_help_panel="Generate data")
 def pronounce(
     text: str = typer.Argument(..., help="Phrase to render"),
     config: Path | None = typer.Option(None, "--config", "-c", help="Use its pronunciations"),
 ) -> None:
-    """Show the ARPAbet and the exact phoneme string each TTS provider will receive."""
+    """Show how each TTS provider will pronounce a phrase."""
     from .config import load_config
     from .phonemes import arpabet_string, phrase_parts, validate_arpabet
     from .scaffold import guess_pronunciations, preview
@@ -150,7 +150,7 @@ def pronounce(
         console.print(f"{prov:9s} {txt}")
 
 
-@app.command()
+@app.command(rich_help_panel="Generate data")
 def generate(
     wake_word: str | None = typer.Argument(None, help='e.g. "hey jarvis" (or use --config)'),
     out: Path = typer.Option(..., "--out", "-o", help="Output dataset directory"),
@@ -161,7 +161,7 @@ def generate(
     splits: list[str] = typer.Option([], "--split", "-s", help="Only these splits"),
     overwrite: bool = typer.Option(False, help="Replace existing shards"),
 ) -> None:
-    """Generate a dataset (needs LiveKit Cloud credentials)."""
+    """Generate a dataset for a wake word (needs LiveKit credentials)."""
     _env()
     _require_credentials()
     from .config import make_config
@@ -179,26 +179,26 @@ def generate(
     console.print_json(json.dumps(stats))
 
 
-@app.command()
+@app.command(rich_help_panel="Dataset tools")
 def push(
     root: Path = typer.Argument(..., help="Generated dataset directory"),
     repo_id: str = typer.Argument(..., help="e.g. livekit/wakeword-bench-hey-livekit"),
     public: bool = typer.Option(False, help="Create a public repo"),
 ) -> None:
-    """Upload a generated dataset to the Hugging Face Hub."""
+    """Upload a dataset to the Hugging Face Hub."""
     from .card import push_to_hub
 
     console.print(push_to_hub(root, repo_id, private=not public))
 
 
-@app.command("media")
+@app.command("media", rich_help_panel="Benchmark")
 def media_cmd(
     out: Path = typer.Option(Path("out/media"), "--out", "-o", help="Output dataset directory"),
     hours: float = typer.Option(
         1.0, help="Scale every source's hours (1.0 = the ~24 h default mix)"
     ),
 ) -> None:
-    """Build the long-form real-world negatives (TV/YouTube audio, music, podcasts) once."""
+    """Build the long-form media negatives (TV, music, speeches)."""
     _env()
     from .media import DEFAULT_HOURS, build_media
 
@@ -206,10 +206,13 @@ def media_cmd(
     console.print(f"media negatives: {path}")
 
 
-@app.command()
+@app.command(rich_help_panel="Benchmark")
 def bench(
-    source: str = typer.Argument(DEFAULT_DATASET, help="Dataset dir or HF repo id"),
-    detectors: list[str] = typer.Option(..., "--detector", "-d", help="Detector spec (repeatable)"),
+    models: list[str] = typer.Argument(
+        ...,
+        help="livekit-wakeword .onnx files, or detector specs (module:factory, openwakeword:name)",
+    ),
+    source: str = typer.Option(DEFAULT_DATASET, "--data", help="Dataset dir or HF repo id"),
     out: Path = typer.Option(Path("results"), "--out", "-o"),
     split: str = typer.Option("test", "--split"),
     threshold: float = typer.Option(0.5, help="Operating threshold for breakdowns"),
@@ -223,7 +226,7 @@ def bench(
         None, "--media", help="Long-form negatives set (`lkwb media`): false alarms per hour"
     ),
 ) -> None:
-    """Benchmark detectors: results/<model>/*.json + results/report.html."""
+    """Benchmark models on a dataset."""
     _env(quiet=as_json)
     from .bench import BenchConfigRun, add_media, evaluate, run_detector
     from .detectors import load_detector
@@ -237,15 +240,16 @@ def bench(
         data = data.shuffle(0).take(limit)
     cfg = BenchConfigRun(debounce_s=debounce, threshold=threshold, score_fpph=score_fpph)
     results = []
-    for spec in detectors:
-        det = load_detector(spec) if workers <= 1 else spec
-        name = det.name if not isinstance(det, str) else spec
+    for spec in models:
+        det = load_detector(spec)
+        name = det.name
         if not as_json:
             console.print(f"[bold]{name}[/] on {len(data)} clips")
-        raw = run_detector(det, data, source=source, workers=workers, progress=not as_json)
+        run = det if workers <= 1 else spec  # worker processes load their own copy
+        raw = run_detector(run, data, source=source, workers=workers, progress=not as_json)
         res = evaluate(raw, data, name, cfg)
         if media is not None:
-            add_media(res, det, data, media, workers=workers, progress=not as_json)
+            add_media(res, run, data, media, workers=workers, progress=not as_json)
         res.save(out / _safe(name))
         results.append(res)
         if not as_json:
@@ -259,7 +263,7 @@ def bench(
         console.print(f"report: [link=file://{path.resolve()}]{path}[/link]")
 
 
-@app.command()
+@app.command(rich_help_panel="Benchmark")
 def compare(
     base: Path = typer.Argument(..., help="Baseline run dir (results/<model>)"),
     new: Path = typer.Argument(..., help="Candidate run dir"),
@@ -267,7 +271,7 @@ def compare(
     min_n: int = typer.Option(20, help="Ignore slices smaller than this"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
-    """What got better / worse between two runs, per metric and per slice."""
+    """Compare two benchmark runs, condition by condition."""
     from .bench import BenchResult
     from .bench import compare as do_compare
 
@@ -312,13 +316,13 @@ def _agent_view(res: object, run_dir: Path, worst: int = 5) -> dict:
     return s
 
 
-@app.command()
+@app.command(rich_help_panel="Benchmark")
 def figures(
     run: Path = typer.Argument(..., help="Saved run dir (results/<model>)"),
     out: Path = typer.Option(Path("assets"), "--out", "-o"),
     prefix: str = typer.Option("", help="Filename prefix"),
 ) -> None:
-    """README-ready SVG charts (dark + light): scorecard, tradeoff, failures, false alarms."""
+    """Write SVG charts for a saved run."""
     from .bench import BenchResult
     from .viz import write_figures
 
@@ -326,7 +330,7 @@ def figures(
         console.print(p)
 
 
-@app.command()
+@app.command(rich_help_panel="Benchmark")
 def report(
     runs: list[Path] = typer.Argument(..., help="Saved run directories"),
     out: Path = typer.Option(Path("results/report.html"), "--out", "-o"),
@@ -334,7 +338,7 @@ def report(
     split: str = typer.Option("test"),
     threshold: float | None = typer.Option(None, help="Re-threshold without re-running"),
 ) -> None:
-    """Re-render a (comparison) report from saved runs."""
+    """Rebuild the HTML report from saved runs."""
     from .bench import BenchResult
     from .loader import WakeWordData
     from .report import render_report
@@ -379,42 +383,44 @@ def _print_summary(res: object) -> None:
     m = s.get("media")
     if m:
         kinds = ", ".join(f"{k} {v['at_threshold']:.2f}" for k, v in m["by_type"].items())
+        at_score = m["at_score_threshold"]
         console.print(
             f"  media ({m['hours']} h): {m['at_threshold']:.2f} false alarms/h @ thr "
-            f"{a['threshold']:.2f} ({kinds}); {m['at_score_threshold']} @ the score threshold"
+            f"{a['threshold']:.2f} ({kinds})"
+            + (f"; {at_score:.2f} @ the score threshold" if at_score is not None else "")
         )
 
 
-@app.command("export-livekit")
+@app.command("export-livekit", rich_help_panel="Dataset tools")
 def export_livekit(
     source: str = typer.Argument(...),
     out: Path = typer.Argument(..., help="livekit-wakeword output_dir"),
     model_name: str = typer.Option(..., help="livekit-wakeword model_name"),
 ) -> None:
-    """Write train/validation clips in livekit-wakeword's generate layout."""
+    """Export train/validation clips for livekit-wakeword training."""
     from .export import export_livekit_wakeword
 
     console.print_json(json.dumps(export_livekit_wakeword(source, out, model_name)))
 
 
-@app.command("export-wav")
+@app.command("export-wav", rich_help_panel="Dataset tools")
 def export_wav(
     source: str = typer.Argument(...),
     out: Path = typer.Argument(...),
     split: str = typer.Option("test"),
 ) -> None:
-    """Write <split>/<id>.wav + metadata.csv (for any other toolchain)."""
+    """Export WAV files and a metadata CSV."""
     from .export import export_wav_folder
 
     console.print(export_wav_folder(source, out, split))
 
 
-@app.command()
+@app.command(rich_help_panel="Generate data")
 def voices(
     check: bool = typer.Option(False, help="Synthesize a test phrase with every voice"),
     models: list[str] = typer.Option([], "--model", "-m"),
 ) -> None:
-    """List (and optionally validate) the TTS voice catalog."""
+    """List or test the TTS voices."""
     _env()
     from collections import Counter
 
@@ -450,13 +456,13 @@ def voices(
         console.print(f"ok {len(vs) - len(bad)}, failed {len(bad)}", bad)
 
 
-@app.command()
+@app.command(rich_help_panel="Dataset tools")
 def verify(
     source: str = typer.Argument(..., help="Dataset directory or HF repo id"),
     split: str = typer.Option("test", "--split"),
     limit: int | None = typer.Option(None),
 ) -> None:
-    """QA a generated dataset: measure audio vs labels (SNR, level, timing, band-limits, split leakage)."""
+    """Check a dataset's audio against its labels."""
     _env()
     from .verify import verify as run_verify
 
@@ -464,18 +470,40 @@ def verify(
     console.print_json(json.dumps(rep, default=str))
 
 
-@app.command()
+@app.command(rich_help_panel="Dataset tools")
 def sources(
     names: list[str] = typer.Argument(None, help="Source names (default: all)"),
     cache_dir: Path = typer.Option(Path(".cache/lkwb")),
 ) -> None:
-    """Download + index noise / RIR / real-speech sources."""
+    """Download the noise, room and speech sources."""
     _env()
     from .sources import SOURCES, prepare_source
 
     for name in names or list(SOURCES):
         items = prepare_source(name, cache_dir)
         console.print(f"{name}: {len(items)} items")
+
+
+_ORDER = [
+    "bench",
+    "compare",
+    "report",
+    "figures",
+    "media",
+    "generate",
+    "init",
+    "pronounce",
+    "knobs",
+    "voices",
+    "verify",
+    "push",
+    "export-livekit",
+    "export-wav",
+    "sources",
+]
+app.registered_commands.sort(
+    key=lambda c: _ORDER.index(c.name or c.callback.__name__.replace("_", "-"))
+)
 
 
 if __name__ == "__main__":

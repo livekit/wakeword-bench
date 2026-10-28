@@ -6,7 +6,7 @@ measures false alarms per hour on ~24 h of it. It is phrase-independent: build i
 it to `benchmark(..., media=DIR)` for any wake word.
 
     lkwb media -o out/media                 # ~24 h (default mix below)
-    lkwb bench out/hey_jarvis -d livekit:hey_jarvis.onnx --media out/media
+    lkwb bench hey_jarvis.onnx --data out/hey_jarvis --media out/media
 
 Sources (all test-only; none is used to train or augment anything in the bench):
 
@@ -180,10 +180,15 @@ def build_media(out: str | Path, hours: dict[str, float] | None = None) -> Path:
     from .dataset import ShardWriter
 
     out = Path(out)
+    marker = out / "media_done.txt"  # sources written to the end, one per line
+    done = set(marker.read_text().split()) if marker.exists() else set()
     shards = sorted((out / "data").glob("media-*.parquet"))
-    done = {p for f in shards for p in pq.read_table(f, columns=["provider"]).column(0).to_pylist()}
+    for f in shards:  # an interrupted source leaves partial shards: drop them, redo it
+        if pq.read_table(f, columns=["provider"]).column(0)[0].as_py() not in done:
+            f.unlink()
+    shards = [f for f in shards if f.exists()]
     w = ShardWriter(out, "media", SR, shard_size=200)
-    w._shard = len(shards)  # append after the existing shards
+    w._shard = int(shards[-1].stem.split("-")[-1]) + 1 if shards else 0
     for source, h in (hours or DEFAULT_HOURS).items():
         if source in done:
             logger.info("[media] %s exists, skip", source)
@@ -204,6 +209,8 @@ def build_media(out: str | Path, hours: dict[str, float] | None = None) -> Path:
                 },
             )
             n += 1
-        w.flush()  # a source is complete on disk before the next starts
+        w.flush()
+        with marker.open("a") as fh:
+            fh.write(source + "\n")
         logger.info("[media] %s: %d clips (%.1f h)", source, n, n * CLIP_S / 3600)
     return out

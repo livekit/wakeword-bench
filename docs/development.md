@@ -1,7 +1,5 @@
 # Development
 
-Start by installing the development dependencies and running the checks below. If you're adding a detector or an audio source, the extension points near the end of this page show where it belongs.
-
 ```bash
 uv sync --all-extras --group dev
 uv run pytest
@@ -9,56 +7,61 @@ uv run ruff check src scripts tests examples
 uv run ruff format --check src scripts tests examples
 ```
 
-The tests use local fixtures and synthetic audio, so they can run offline. They build a small synthetic dataset and check the loader, the benchmark metrics, the report, mixing at an exact SNR, codecs without delay, phoneme rendering against the providers' documented examples, and that a silent model scores 0.
+The tests run offline on a small synthetic dataset. CI runs them on Linux, macOS and Windows with Python 3.12 and 3.13, and checks that the built wheel installs and runs.
 
-## Platform policy
+## Rules
 
-The library is pure Python (numpy, scipy, soundfile, pyarrow) and runs on Linux, macOS and Windows. Keep it that way: no platform-specific code or dependencies in `src/` or in the uv dependency groups. Whisper, matplotlib and other QA tools are allowed only in the `dev` group.
+- The library runs on Linux, macOS and Windows. No platform-specific code or dependencies in `src/`.
+- Whisper, matplotlib and other QA tools go in the `dev` group only, never in the package.
+- Train and test audio never share voices, noise, rooms or speakers.
 
 ## Layout
 
 ```
 src/livekit_wakeword_bench/
-  cli.py          lkwb commands
-  config.py       settings, knobs, sizes, plans
-  generate.py     plan → TTS → mix → parquet shards
-  text.py         wake word forms, carrier sentences, near-miss phrases, phonetic matching
-  phonemes.py     ARPAbet → Cartesia / IPA / Rime phoneme syntax
-  tts.py          LiveKit Inference TTS: concurrency limit, cache, retries
-  voices.py       voice catalog (voices.json) and held-out voice split
-  sources.py      Hugging Face noise / room / speech sources, train and test pools
-  augment.py      the augmentation chain
-  mix.py          signal processing: resampling, trimming, reverb, SNR mixing, filters
-  dataset.py      on-disk format and schema
-  loader.py       WakeWordData, Augment, PyTorch adapter
-  detectors.py    Detector protocol and built-in adapters
-  bench.py        benchmark runner, metrics, breakdowns, compare
-  viz.py          SVG charts (LiveKit Bytes design tokens)
+  bench.py        benchmark, metrics, breakdowns, compare
+  detectors.py    Detector protocol, livekit-wakeword and openWakeWord adapters
+  viz.py          charts
   report.py       HTML report
-  verify.py       dataset checks
-  export.py       livekit-wakeword layout, WAV + CSV
-  card.py         dataset card and Hub upload
-  scaffold.py     lkwb init
-scripts/          development tools (not part of the package)
-examples/         runnable examples
-configs/          example generation configs
-assets/           README charts
-docs/             this documentation
+  generate.py     plan → TTS → mix → parquet
+  text.py         wake word forms, sentences, near-miss phrases
+  phonemes.py     ARPAbet → each provider's phoneme syntax
+  tts.py          LiveKit Inference TTS: concurrency, cache, retries
+  voices.py       voice list and held-out test voices
+  sources.py      noise, room and speech recordings
+  augment.py      effects chain
+  mix.py          signal processing
+  media.py        long-form TV, music and speech negatives
+  dataset.py      on-disk format
+  loader.py       WakeWordData, Augment, PyTorch
+  config.py       settings, sizes, plans
+  export.py, card.py, scaffold.py, verify.py, cli.py
+scripts/          dev tools: qa_dataset.py (Whisper check), readme_figures.py (README charts)
 ```
-
-## Development scripts
-
-| script | does |
-|---|---|
-| `scripts/qa_dataset.py DATASET [--asr-n 20] [--plots DIR]` | runs `verify`, transcribes a sample of clips with Whisper to confirm they say what their labels claim, and writes a spectrogram gallery |
-| `scripts/readme_figures.py RUN --dataset D --model M` | rebuilds every README chart from a saved run, including the same-clip comparison with and without a competing voice |
-
-Both need the `dev` group; `readme_figures.py` also needs the `livekit` extra.
 
 ## Adding things
 
-- **A detector adapter:** add a factory to `_BUILTIN` in `detectors.py`. Detectors only need `name` and `detect(audio, sample_rate) -> Prediction`.
-- **An audio source:** `register(SourceSpec(...))` in `sources.py` (see [Audio sources](audio-sources.md)). Keep train and test pools disjoint.
-- **A TTS voice:** add it to `voices.json` under a phoneme-capable model, then run `lkwb voices --check`.
-- **A TTS provider:** it must accept inline phonemes. Add its syntax to `phonemes.py`, verify it by synthesizing words from phonemes alone, and add a test pinned to the provider's documented examples.
-- **A breakdown axis:** add the metadata column to `POSITIVE_AXES` or `NEGATIVE_AXES` in `bench.py`.
+- **A model adapter:** add it to `_BUILTIN` in `detectors.py`. A model only needs `name` and `detect(audio, sample_rate) -> Prediction`.
+- **An audio source:** `register(SourceSpec(...))` in `sources.py`. Keep train and test pools separate.
+- **A TTS voice:** add it to `voices.json`, then run `lkwb voices --check`.
+- **A TTS provider:** it must accept phonemes. Add its syntax to `phonemes.py` with a test pinned to the provider's documented examples.
+- **A breakdown:** add the column to `POSITIVE_AXES` or `NEGATIVE_AXES` in `bench.py`.
+
+## Releasing
+
+The version comes from the git tag, so there is nothing to edit before a release. Pushing a `v*` tag runs [`publish.yml`](../.github/workflows/publish.yml). It builds the package, checks that the version matches the tag, installs the wheel in a clean environment, publishes to PyPI and creates a GitHub release with notes.
+
+One-time setup:
+
+1. On PyPI, add a [trusted publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/) for `livekit-wakeword-bench`: owner `livekit`, repository `wakeword-bench`, workflow `publish.yml`, environment `pypi`.
+2. On GitHub, create the `pypi` environment (Settings → Environments). Add required reviewers if releases need approval.
+
+Release:
+
+```bash
+git checkout main && git pull
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Pre-releases work the same way: `v0.2.0rc1`.

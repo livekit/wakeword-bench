@@ -63,7 +63,7 @@ def write_card(root: Path, cfg: BenchConfig, stats: dict[str, Any], gen: Any = N
         'data = WakeWordData("<this repo>", split="test")',
         'noisy_misses = data.filter(category="positive", noise_bucket=["very_noisy", "extreme"])',
         "",
-        'result = benchmark("livekit:hey_livekit.onnx", "<this repo>")',
+        'result = benchmark("hey_livekit.onnx", "<this repo>")',
         'print(result.summary()["at_threshold"])',
         "```",
         "",

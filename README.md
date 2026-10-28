@@ -14,10 +14,10 @@ We can isolate one of those possibilities by playing the same recording with and
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/teaser_dark.svg">
-  <img alt="One clip is detected alone and missed with a second voice; recall falls from 83% to 30% as the second voice gets louder" src="assets/teaser_light.svg">
+  <img alt="One clip is detected alone and missed with a second voice; recall falls from 94% to 65% as the second voice gets louder" src="assets/teaser_light.svg">
 </picture>
 
-The clip's score drops from 0.97 to 0.01 with a competing voice 5 dB quieter. Across 3,000 test wake words, recall falls from 83% to 30% as that voice gets louder.
+The clip's score drops from 0.96 to 0.15 with a competing voice 5 dB quieter. Across 3,000 test wake words, recall falls from 94% to 65% as that voice gets louder.
 
 That gives the developer something specific to work on: competing speech. It also gives them a way to check whether more training actually helps.
 
@@ -25,7 +25,7 @@ LiveKit WakeWord Bench makes that process repeatable across noise, speakers, roo
 
 Use the public “Hey LiveKit” dataset, generate one for your own phrase, or bring your own data and detector.
 
-**Docs:** [Benchmarking](docs/benchmarking.md) · [Metrics](docs/metrics.md) · [Generating datasets](docs/generating-datasets.md) · [Phoneme steering](docs/phonemes.md) · [Augmentation](docs/augmentation.md) · [Loading data](docs/loading-data.md) · [Configuration](docs/configuration.md) · [CLI](docs/cli.md) · [All docs](docs/README.md)
+**Docs:** [Benchmark](docs/benchmark.md) · [Generate](docs/generate.md) · [Train](docs/train.md) · [Reference](docs/reference.md) · [Development](docs/development.md)
 
 ## Try it
 
@@ -34,64 +34,52 @@ From a checkout of this repo, with Python 3.12+ and [uv](https://docs.astral.sh/
 ```bash
 uv sync --extra livekit
 
-# Point this at your LiveKit wake word ONNX model.
-uv run lkwb bench -d livekit:path/to/model.onnx --limit 1000
+# Point this at your livekit-wakeword model.
+uv run lkwb bench path/to/hey_livekit.onnx --limit 1000
 
 # Run the full test set before reporting results.
-uv run lkwb bench -d livekit:path/to/model.onnx
+uv run lkwb bench path/to/hey_livekit.onnx
 ```
 
-The default dataset has 7,873 clips (12.3 hours). Each run saves JSON summaries, per-clip outcomes and score traces under `results/<model>/`, plus `results/report.html` with playable failures. Benchmarking existing data doesn't need LiveKit credentials. How the score and other numbers are computed: [Metrics](docs/metrics.md).
+The default dataset has 7,873 clips (12.3 hours). Each run saves JSON summaries, per-clip outcomes and score traces under `results/<model>/`, plus `results/report.html` with playable failures. Benchmarking existing data doesn't need LiveKit credentials. How the score and other numbers are computed: [Benchmark](docs/benchmark.md#read-the-results).
 
 **The score is recall at no more than 0.5 false alarms per hour.** Higher is better. Set a different target with `--score-fpph`. Quick runs use a fixed random subset; compare runs with the same dataset and limit. Use `--workers 1` for accurate compute timing.
 
 ## What it finds
 
-On the `hey_livekit` model, recall is 76% at the default threshold, but false alarms occur about 29 times per hour. At the benchmark's false-alarm target, recall is **44.5%**.
+The [`hey_livekit`](https://github.com/livekit/livekit-wakeword) model catches 91% of wake words at the default threshold, with 1.3 false alarms per hour. At the benchmark's target of 0.5 false alarms per hour, recall is **89.8%**.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/tradeoff_dark.svg">
-  <img alt="Recall falls to 44.5% when the threshold is raised to meet the target of at most 0.5 false alarms per hour" src="assets/tradeoff_light.svg">
-</picture>
-
-The breakdown points to specific training needs. These results use the default threshold:
+The average hides where it fails. These results use the default threshold:
 
 | Condition | Result | Data to try next |
 |---|---|---|
-| Loud second speaker | 30% recall | More competing talkers |
-| Wake word after other speech | 63% recall, vs 83% when first | More wake words inside sentences |
-| Near-miss phrases | 59% trigger the model | More adversarial negatives |
-| Noise at −5 to 0 dB SNR | 62% recall | More examples in loud noise |
-
-<details>
-<summary>More result plots</summary>
+| Loud second speaker | 65% recall, vs 94% alone | More competing talkers |
+| Babble noise | 79% recall | More crowd and café noise |
+| Noise louder than speech | 80% recall | More examples in loud noise |
+| Near-miss phrases | 30% trigger the model; “hey live kid” 77% | More adversarial negatives |
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/failures_dark.svg">
-  <img alt="Recall by condition, with 95% confidence intervals" src="assets/failures_light.svg">
+  <img alt="Recall by condition, with 95% confidence intervals: another voice, noise and one TTS provider are below average" src="assets/failures_light.svg">
 </picture>
 
-Phrasing, accent, noise and reverb affect recall. Whiskers show 95% confidence intervals.
+Red is clearly worse than average, green clearly better, gray too close to call. Whiskers show 95% confidence intervals.
+
+<details>
+<summary>Near-miss phrases</summary>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/near_misses_dark.svg">
-  <img alt="Replacing one word in hey live kit still triggers the model 58 to 62% of the time" src="assets/near_misses_light.svg">
+  <img alt="Changing one word of hey live kit triggers the model 27 to 33% of the time; hey live kid triggers it 77% of the time" src="assets/near_misses_light.svg">
 </picture>
 
-Changing one word often still triggers the model.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/alarm_sources_dark.svg">
-  <img alt="False alarms per hour by audio source at the default threshold" src="assets/alarm_sources_light.svg">
-</picture>
-
-Speech accounts for most false alarms in this evaluation.
+Changing one word still triggers the model about a third of the time.
 
 To reproduce with `hey_livekit.onnx` available locally:
 
 ```bash
-uv run lkwb bench -d livekit:hey_livekit.onnx
-uv run --group dev --extra livekit python scripts/readme_figures.py results/livekit_hey_livekit --dataset binhpham/wakeword-bench-hey-livekit --model hey_livekit.onnx
+uv run lkwb bench hey_livekit.onnx
+uv run --group dev --extra livekit python scripts/readme_figures.py results/hey_livekit --dataset binhpham/wakeword-bench-hey-livekit --model hey_livekit.onnx
 ```
 
 </details>
@@ -123,11 +111,11 @@ result.save("results/my-model")
 For CLI use, expose a factory that returns your detector:
 
 ```bash
-uv run lkwb bench -d my_pkg.models:make_model --json
+uv run lkwb bench my_pkg.models:make_model --json
 uv run lkwb compare results/baseline results/candidate --json
 ```
 
-Built-in adapters support `livekit:<model.onnx>` and `openwakeword:<name>`. See [examples/](examples/) for custom detectors and [AGENTS.md](AGENTS.md) for the benchmark → train → compare workflow. More in [Benchmarking](docs/benchmarking.md).
+A `.onnx` path runs a livekit-wakeword model, and `openwakeword:<name>` runs openWakeWord. See [examples/](examples/) for custom detectors and [AGENTS.md](AGENTS.md) for the benchmark → train → compare workflow. More in [Benchmark](docs/benchmark.md).
 
 ## Generate training data
 
@@ -160,7 +148,7 @@ Use `--size tiny` for a smoke test or `small` for a first dataset. For unusual n
 
 Run `lkwb knobs` for all settings. Pass them as `--set key=value`, Python keyword arguments such as `augment__p_reverb=0.8`, or YAML with `-c`.
 
-More: [Generating datasets](docs/generating-datasets.md) (credentials, plans, sizes, verify, publishing), [Phoneme steering](docs/phonemes.md), [Augmentation](docs/augmentation.md), [Configuration](docs/configuration.md).
+More in [Generate](docs/generate.md) and [Reference](docs/reference.md#settings).
 
 ## Load data for training
 
@@ -174,7 +162,7 @@ x, y = train.take(512).arrays()
 torch_dataset = train.torch()  # requires: uv sync --extra torch
 ```
 
-`Augment()` adds fresh noise, reverb and other effects from training sources on each access. Never train on the test split or test sources. `lkwb export-livekit` writes the LiveKit training layout; `lkwb export-wav` writes WAV files and a CSV. More in [Loading data](docs/loading-data.md).
+`Augment()` adds fresh noise, reverb and other effects from training sources on each access. Never train on the test split or test sources. `lkwb export-livekit` writes the LiveKit training layout; `lkwb export-wav` writes WAV files and a CSV. More in [Train](docs/train.md).
 
 <details>
 <summary>Audio sources and licensing</summary>
@@ -186,25 +174,19 @@ torch_dataset = train.torch()  # requires: uv sync --extra torch
 
 WHAM!, ESC-50, Treble10 and GTZAN have non-commercial or research-only restrictions. Use `sources:` in your config to restrict source selection.
 
-Clips contain 16 kHz audio plus metadata for their voice, phrase, timing and augmentation. See [Dataset format](docs/dataset-format.md) and [Audio sources](docs/audio-sources.md).
+Clips contain 16 kHz audio plus metadata for their voice, phrase, timing and augmentation. See [Reference](docs/reference.md#dataset-columns).
 
 </details>
 
 ## Documentation
 
-| Guide | Covers |
+| I want to | Read |
 |---|---|
-| [Benchmarking](docs/benchmarking.md) | running benchmarks, plugging in a model, outputs, comparing runs, re-scoring |
-| [Metrics](docs/metrics.md) | the score, recall, false alarms, latency, compute, confidence intervals |
-| [Generating datasets](docs/generating-datasets.md) | LiveKit credentials, plans, sizes, what gets generated, verifying, publishing |
-| [Phoneme steering](docs/phonemes.md) | providers, pronunciations, ARPAbet |
-| [Augmentation](docs/augmentation.md) | rooms, other voices, noise levels, microphone and codec effects |
-| [Audio sources](docs/audio-sources.md) | where noise, rooms and real speech come from, licenses, adding sources |
-| [Dataset format](docs/dataset-format.md) | files and every column |
-| [Loading data](docs/loading-data.md) | `WakeWordData`, windows, augmenting on the fly, PyTorch, exports |
-| [Configuration](docs/configuration.md) | every knob and its default |
-| [CLI reference](docs/cli.md) | every command and option |
-| [Development](docs/development.md) | tests, layout, scripts, extending the library |
+| test a wake word model | [Benchmark](docs/benchmark.md) |
+| make data for my own wake word | [Generate](docs/generate.md) |
+| train on the data | [Train](docs/train.md) |
+| look up a command, setting or column | [Reference](docs/reference.md) |
+| work on this repo or cut a release | [Development](docs/development.md) |
 
 ## Development
 

@@ -1578,7 +1578,6 @@ wheels = [
 
 [[package]]
 name = "livekit-wakeword-bench"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -1638,7 +1637,7 @@ requires-dist = [
     { name = "typer", specifier = ">=0.27.3" },
     { name = "wordfreq", specifier = ">=3.1.1" },
 ]
-provides-extras = ["torch", "livekit"]
+provides-extras = ["livekit", "torch"]
 
 [package.metadata.requires-dev]
 dev = [
