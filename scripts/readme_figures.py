@@ -1,14 +1,16 @@
-"""Build the README figures from a saved benchmark run (dev tool).
+"""Build the README figures from a saved benchmark run (dev tool), in LiveKit light and dark.
 
-    uv run --group dev python scripts/readme_figures.py results/hey_livekit \
+    uv run --group dev scripts/readme_figures.py results/hey_livekit \
         --dataset binhpham/wakeword-bench-hey-livekit --model path/to/hey_livekit.onnx
 
+Writes <name>_light.svg and <name>_dark.svg for teaser, failures and near_misses.
 Teaser: one test clip the model detects, replayed with a second real voice at --sir dB.
 """
 
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -23,8 +25,19 @@ from livekit_wakeword_bench.viz import (
     hstack,
     near_misses,
     recall_by_talker,
+    set_theme,
     traces,
 )
+
+THEMES = ("light", "dark")
+
+
+def write(out: Path, name: str, draw: Callable[[], str]) -> None:
+    """One figure per theme: <name>_light.svg, <name>_dark.svg."""
+    for theme in THEMES:
+        set_theme(theme)
+        (out / f"{name}_{theme}.svg").write_text(draw(), encoding="utf-8")
+    set_theme("light")
 
 
 def main() -> None:
@@ -39,10 +52,8 @@ def main() -> None:
 
     res = BenchResult.load(args.run)
     out = Path(args.out)
-    (out / "failures.svg").write_text(
-        failures(res, axes=README_AXES, significant_only=True), encoding="utf-8"
-    )
-    (out / "near_misses.svg").write_text(near_misses(res), encoding="utf-8")
+    write(out, "failures", lambda: failures(res, axes=README_AXES, significant_only=True))
+    write(out, "near_misses", lambda: near_misses(res))
 
     det = load_detector(args.model)
     thr = res.cfg.threshold
@@ -84,8 +95,7 @@ def main() -> None:
                 "scores": both.scores,
             },
         ]
-        fig = hstack([traces(ex, thr, w=560), recall_by_talker(res)])
-        (out / "teaser.svg").write_text(fig, encoding="utf-8")
+        write(out, "teaser", lambda: hstack([traces(ex, thr, w=560), recall_by_talker(res)]))
         print(
             f"teaser from {s.id} ({s.meta['provider']}/{s.meta['voice_name']}): "
             f"{alone.scores.max():.2f} alone, {both.scores.max():.2f} with a voice at {args.sir:g} dB"

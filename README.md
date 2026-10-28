@@ -55,7 +55,10 @@ Validation and test clips sample combinations of these conditions. They are not 
 
 For example, the same wake word can be detected alone and missed with a competing speaker:
 
-<img alt="A wake word is detected alone but missed with a competing voice" src="assets/teaser.svg">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/teaser_dark.svg">
+  <img alt="A wake word is detected alone but missed with a competing voice" src="assets/teaser_light.svg" width="100%">
+</picture>
 
 Training clips are stored clean by default so you can [add fresh effects while training](docs/train.md). Test voices, noise, rooms and recorded speakers are held apart from training. Never train on the test split or test sources. Some source corpora restrict commercial use; see [sources and licenses](docs/reference.md#audio-sources).
 
