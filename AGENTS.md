@@ -44,7 +44,7 @@ uv run lkwb compare results/base/baseline results/cand/candidate --json
 
 ## Outputs
 
-`lkwb bench --json` prints one object per detector:
+`lkwb bench --json` prints a JSON array with one object per detector. Example entry:
 
 ```json
 {"detector": "hey_livekit", "score": 0.8983, "score_definition": "recall at FPPH <= 0.5",
