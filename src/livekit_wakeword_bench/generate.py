@@ -32,7 +32,7 @@ from .phonemes import (
 from .sources import load_pools
 from .text import TextSampler, Utterance
 from .tts import Synthesizer, TTSRequest, speed_kwargs
-from .voices import Voice, load_voices, split_voices
+from .voices import Voice, load_voices, split_voices, voices_for_language
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,21 @@ class Generator:
         self.out = Path(out_dir)
         self.sr = cfg.sample_rate
         voices = load_voices(models=cfg.tts.models or None)
+        if not cfg.tts.models:  # every model (and voice) that speaks the phrase's language
+            speaking = voices_for_language(voices, cfg.language)
+            if not speaking:
+                raise ValueError(
+                    f"no bundled TTS voice speaks language {cfg.language!r} (see `lkwb voices "
+                    "--language`); set `tts.models` to choose models yourself"
+                )
+            if len(speaking) < len(voices):
+                logger.info(
+                    "language %r: %d voices from %s",
+                    cfg.language,
+                    len(speaking),
+                    ", ".join(sorted({v.model for v in speaking})),
+                )
+            voices = speaking
         if cfg.tts.phonemes:
             dropped = sorted({v.model for v in voices if not supports_phonemes(v.model)})
             if dropped:

@@ -419,14 +419,19 @@ def export_wav(
 def voices(
     check: bool = typer.Option(False, help="Synthesize a test phrase with every voice"),
     models: list[str] = typer.Option([], "--model", "-m"),
+    language: str | None = typer.Option(
+        None, "--language", "-l", help="Only the voices that speak this language (e.g. es, ja)"
+    ),
 ) -> None:
     """List or test the TTS voices."""
     _env()
     from collections import Counter
 
-    from .voices import load_voices
+    from .voices import base_language, load_voices, voices_for_language
 
     vs = load_voices(models=models or None)
+    if language:
+        vs = voices_for_language(vs, language)
     for m, n in Counter(v.model for v in vs).items():
         console.print(f"{m}: {n} voices")
     console.print("accents:", dict(Counter(v.accent for v in vs)))
@@ -445,6 +450,11 @@ def voices(
                         v.model,
                         v.id,
                         "Testing one two " + (render_phrase("three", v.model) or "three") + ".",
+                        language=base_language(language)
+                        if language
+                        else "en"
+                        if "en" in v.languages
+                        else min(v.languages),
                         extra=provider_options(v.model),
                     )
                     for v in vs

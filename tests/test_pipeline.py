@@ -448,3 +448,35 @@ def test_phrases_without_latin_words():
     plans = Generator(cfg, "unused").plan("train", cfg.splits["train"])
     cats = {p.category for p in plans}
     assert "positive" in cats and "speech" in cats and "adversarial" not in cats
+
+
+def test_voices_follow_the_language():
+    """Each language gets every model (and voice) that speaks it."""
+    from livekit_wakeword_bench.config import make_config
+    from livekit_wakeword_bench.generate import Generator
+    from livekit_wakeword_bench.voices import base_language, load_voices, voices_for_language
+
+    def models(language: str) -> set[str]:
+        return {v.model for v in voices_for_language(load_voices(), language)}
+
+    everything = {"cartesia/sonic-3", "inworld/inworld-tts-2", "xai/tts-1", "rime/mistv3"}
+    assert models("en") == models("es") == models("de") == models("fr") == everything
+    assert models("pt-BR") == models("ja") == everything - {"rime/mistv3"}
+    assert models("hi") == everything - {"rime/mistv3"}  # Rime has no Hindi speakers yet
+    assert models("sw") == {"inworld/inworld-tts-2"} and models("nb") == models("no")
+    assert models("tlh") == set() and base_language("pt_BR") == "pt"
+    # Rime speakers speak their own languages; English keeps exactly its old voices
+    es = {v.id for v in voices_for_language(load_voices(models=["rime/mistv3"]), "es")}
+    en = {v.id for v in voices_for_language(load_voices(models=["rime/mistv3"]), "en")}
+    assert {"diego", "isa"} <= es and "diego" not in en and len(en) == 62 and es & en
+
+    def generator(language: str, **kv: object) -> Generator:
+        cfg = make_config("hola asistente", None, "small", None, {"language": language, **kv})
+        return Generator(cfg, "unused")
+
+    g = generator("es", **{"tts.phonemes": False})
+    assert {v.model for v in g.train_voices + g.test_voices} == everything
+    g = generator("es", **{"tts.models": ["cartesia/sonic-3"]})  # explicit models win
+    assert {v.model for v in g.train_voices + g.test_voices} == {"cartesia/sonic-3"}
+    with pytest.raises(ValueError, match="no bundled TTS voice speaks"):
+        generator("tlh")

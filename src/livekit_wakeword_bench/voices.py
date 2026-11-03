@@ -44,6 +44,7 @@ class Voice:
     gender: str
     accent: str
     accent_detail: str
+    languages: frozenset[str] = frozenset({"en"})
 
     @property
     def provider(self) -> str:
@@ -52,6 +53,42 @@ class Voice:
     @property
     def key(self) -> str:
         return f"{self.model}:{self.id}"
+
+
+# Languages each bundled model speaks through LiveKit Inference, as language codes without a
+# region ("pt" for pt-BR): https://docs.livekit.io/agents/models/tts/ (checked 2026-11-03).
+# A voice can narrow its model's set with "languages" in voices.json: Rime speakers each speak
+# their own languages (https://users.rime.ai/data/voices/all-v2.json).
+MODEL_LANGUAGES: dict[str, frozenset[str]] = {
+    "cartesia/sonic-3": frozenset(
+        "en de es fr ja pt zh hi ko it nl pl ru sv tr tl bg ro ar cs el fi hr ms sk da ta uk hu "
+        "no vi bn th he ka id te gu kn ml mr pa".split()
+    ),
+    "inworld/inworld-tts-2": frozenset(
+        "en zh ja ko ru it es pt fr de pl nl hi he ar af sq am hy as az eu be bn bg my yue ca "
+        "ceb hr cs da yih arz et fil fi gl gbm ka el gu afb ht acw hu is id jv kn kk kok lo lv "
+        "ayl lt lb mk mai mg ms ml mr mn ars ne uzn nb nn or acx ps fa pms pa ro sr sd si sk sl "
+        "sw sv ta te th aeb tr uk ur uz vi vro cy".split()
+    ),
+    "xai/tts-1": frozenset("en ar bn zh fr de hi id it ja ko pt ru es tr vi".split()),
+    "rime/mistv3": frozenset("en es fr de hi".split()),
+}
+# the same language under the codes different providers use
+_ALIASES = {"no": "nb", "nb": "no", "tl": "fil", "fil": "tl", "iw": "he", "he": "iw"}
+
+
+def base_language(language: str) -> str:
+    """ "pt-BR" / "pt_br" -> "pt"."""
+    return language.strip().lower().replace("_", "-").split("-")[0]
+
+
+def voices_for_language(voices: list[Voice], language: str) -> list[Voice]:
+    """The voices that speak `language`: from every model that supports it, so a phrase gets as
+    many models (and voices) as its language allows. Models missing from `MODEL_LANGUAGES` are
+    treated as English-only."""
+    code = base_language(language)
+    codes = {code, _ALIASES.get(code, code)}
+    return [v for v in voices if codes & v.languages]
 
 
 def load_voices(path: str | Path | None = None, models: list[str] | None = None) -> list[Voice]:
@@ -74,6 +111,9 @@ def load_voices(path: str | Path | None = None, models: list[str] | None = None)
                     gender=v.get("gender") or "unknown",
                     accent=normalize_accent(v.get("accent")),
                     accent_detail=v.get("accent_detail") or v.get("accent") or "",
+                    languages=frozenset(
+                        v.get("languages") or MODEL_LANGUAGES.get(model, frozenset({"en"}))
+                    ),
                 )
             )
     return out
