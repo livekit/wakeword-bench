@@ -89,9 +89,9 @@ The bundled providers accept phonemes to guide wake word pronunciation. Voice co
 | Cartesia `sonic-3` | 43 | `<<ˈ\|l\|aɪ\|v\|ˌ\|k\|ɪ\|t>>` |
 | Inworld `inworld-tts-2` | 26 | `/ˈlaɪvˌkɪt/` |
 | xAI `tts-1` | 26 | `/ˈlaɪvˌkɪt/` |
-| Rime `mistv3` | 62 | `{l1Yv} {k1It}` |
+| Rime `mistv3` | 78 | `{l1Yv} {k1It}` |
 
-Phrases in other languages (`language` other than `en`) use only the Inworld and xAI voices: the bundled Cartesia and Rime voices are English voices (Rime rejects other languages and Cartesia reads them with an English accent). Set `tts.models` to choose the models yourself.
+Generation uses every model, and every voice, that speaks the phrase's `language`, from each model's official language list in LiveKit Inference (`MODEL_LANGUAGES` in `voices.py`). Rime speakers each speak their own languages (the `languages` field of their voices), so English uses the English speakers and Spanish, German and French use Rime's native speakers. For example, `es`, `de` and `fr` get all four models, `ja`, `pt` and `hi` get Cartesia, Inworld and xAI, and `sw` gets Inworld. `lkwb voices --language es` lists the voices for a language; set `tts.models` to choose the models yourself.
 
 ## Audio sources
 
