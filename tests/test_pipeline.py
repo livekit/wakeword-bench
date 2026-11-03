@@ -428,3 +428,23 @@ def test_negative_sentences_never_say_the_wake_word():
     assert (
         s.filler == FILLER_SPEECH
     )  # unaffected wake words keep the exact same sentence pool (reproducible)
+
+
+def test_phrases_without_latin_words():
+    """Phrases in other scripts have no English phonemes: nothing counts as saying them, and
+    there are no confusables to generate."""
+    import random
+
+    from livekit_wakeword_bench.config import make_config
+    from livekit_wakeword_bench.generate import Generator
+    from livekit_wakeword_bench.text import FILLER_SPEECH, TextSampler, phonetic_distance
+
+    assert phonetic_distance("okay so", "ねえ ロボット") > 0
+    s = TextSampler("你好小智", ["你好小智"], [], 0.35, random.Random(0))
+    assert s.filler == FILLER_SPEECH and s.carrier_after and s.carrier_before and not s.adv
+    for _ in range(50):
+        s.positive()
+    cfg = make_config("ねえ ロボット", None, "small", None, {"language": "ja"})
+    plans = Generator(cfg, "unused").plan("train", cfg.splits["train"])
+    cats = {p.category for p in plans}
+    assert "positive" in cats and "speech" in cats and "adversarial" not in cats
