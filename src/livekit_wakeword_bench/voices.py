@@ -54,6 +54,15 @@ class Voice:
         return f"{self.model}:{self.id}"
 
 
+# The bundled Cartesia and Rime voices are English voices: Rime rejects other languages, and
+# Cartesia reads them with an English accent. Phrases in other languages use the rest.
+ENGLISH_ONLY_MODELS = ("cartesia/sonic-3", "rime/mistv3")
+
+
+def is_english(language: str) -> bool:
+    return language.lower().split("-")[0].split("_")[0] == "en"
+
+
 def load_voices(path: str | Path | None = None, models: list[str] | None = None) -> list[Voice]:
     """Load the voice catalog (bundled voices.json unless `path` is given)."""
     if path is None:

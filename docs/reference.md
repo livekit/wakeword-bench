@@ -91,6 +91,8 @@ The bundled providers accept phonemes to guide wake word pronunciation. Voice co
 | xAI `tts-1` | 26 | `/ˈlaɪvˌkɪt/` |
 | Rime `mistv3` | 62 | `{l1Yv} {k1It}` |
 
+Phrases in other languages (`language` other than `en`) use only the Inworld and xAI voices: the bundled Cartesia and Rime voices are English voices (Rime rejects other languages and Cartesia reads them with an English accent). Set `tts.models` to choose the models yourself.
+
 ## Audio sources
 
 Training and validation use separate source pools from testing.

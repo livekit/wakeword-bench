@@ -448,3 +448,21 @@ def test_phrases_without_latin_words():
     plans = Generator(cfg, "unused").plan("train", cfg.splits["train"])
     cats = {p.category for p in plans}
     assert "positive" in cats and "speech" in cats and "adversarial" not in cats
+
+
+def test_voices_follow_the_language():
+    """English uses every bundled model; other languages skip the English-only voices."""
+    from livekit_wakeword_bench.config import make_config
+    from livekit_wakeword_bench.generate import Generator
+    from livekit_wakeword_bench.voices import ENGLISH_ONLY_MODELS, is_english
+
+    def models(language: str, **kv: object) -> set[str]:
+        cfg = make_config("hola asistente", None, "small", None, {"language": language, **kv})
+        g = Generator(cfg, "unused")
+        return {v.model for v in g.train_voices + g.test_voices}
+
+    assert is_english("en") and is_english("en-US") and not is_english("es")
+    assert set(ENGLISH_ONLY_MODELS) <= models("en", **{"tts.phonemes": False})
+    es = models("es")
+    assert es and not es & set(ENGLISH_ONLY_MODELS)
+    assert models("es", **{"tts.models": ["cartesia/sonic-3"]}) == {"cartesia/sonic-3"}  # explicit

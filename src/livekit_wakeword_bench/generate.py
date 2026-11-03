@@ -32,7 +32,7 @@ from .phonemes import (
 from .sources import load_pools
 from .text import TextSampler, Utterance
 from .tts import Synthesizer, TTSRequest, speed_kwargs
-from .voices import Voice, load_voices, split_voices
+from .voices import ENGLISH_ONLY_MODELS, Voice, is_english, load_voices, split_voices
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,11 @@ class Generator:
         self.out = Path(out_dir)
         self.sr = cfg.sample_rate
         voices = load_voices(models=cfg.tts.models or None)
+        if not cfg.tts.models and not is_english(cfg.language):
+            voices = [v for v in voices if v.model not in ENGLISH_ONLY_MODELS]
+            logger.info(
+                "language %r: voices from %s", cfg.language, sorted({v.model for v in voices})
+            )
         if cfg.tts.phonemes:
             dropped = sorted({v.model for v in voices if not supports_phonemes(v.model)})
             if dropped:
