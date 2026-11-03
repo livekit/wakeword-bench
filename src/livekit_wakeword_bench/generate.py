@@ -119,7 +119,16 @@ class Generator:
                 plans.append(Plan(f"{split}-{cat}-{i:06d}", cat, make(), v, speed))
 
         add("positive", spec.n_positive, texts.positive)
-        add("adversarial", spec.n_adversarial, texts.adversarial)
+        n_adversarial = spec.n_adversarial
+        if n_adversarial and not texts.adv:
+            logger.warning(
+                "no confusable phrases for %r (no English phonemes): skipping %d adversarial "
+                "clips; add `hard_negatives` to have some",
+                self.cfg.wake_word,
+                n_adversarial,
+            )
+            n_adversarial = 0
+        add("adversarial", n_adversarial, texts.adversarial)
         add("speech", spec.n_speech, texts.speech)
         for i in range(spec.n_noise):
             plans.append(Plan(f"{split}-noise-{i:06d}", "noise", None, None, 1.0))

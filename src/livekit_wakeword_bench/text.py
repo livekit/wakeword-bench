@@ -324,7 +324,7 @@ def _substring_distance(pattern: list[str], text: list[str]) -> int:
 
 def phonetic_distance(transcript: str, wake_word: str) -> int:
     """How far the closest stretch of `transcript` is from the wake word, in phonemes (0 = the wake word is said exactly, under some pronunciation of each word)."""
-    wake = phrase_variants(wake_word)
+    wake = [v for v in phrase_variants(wake_word) if v]  # none: no Latin words ("你好小智")
     words = re.findall(r"[a-zA-Z']+", transcript)
     if not words or not wake:
         return 99
